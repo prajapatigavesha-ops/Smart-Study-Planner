@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: smart-study-planner
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: PORT
+        value: 3000
+      - key: OPENAI_API_KEY
+        sync: false # Set this in Render dashboard if you want to use OpenAI
