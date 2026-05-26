@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Dashboard - Study Planner</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <script src="theme.js"></script>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="icon" href="data:,">
+</head>
+<body>
+
+  <nav>
+    <h1>Dashboard</h1>
+    <div>
+      <button onclick="toggleTheme()" class="theme-toggle" style="background:transparent; border:1px solid #1976d2; border-radius:4px; margin-right:5px; padding: 8px 12px; cursor: pointer; color: #1976d2;">🌓 Dark Mode</button>
+      <button onclick="window.location.href='index.html'" style="padding: 8px 12px; cursor: pointer;">Home</button>
+    </div>
+  </nav>
+
+  <section class="dashboard">
+    <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 20px;">
+      <!-- Tasks Section -->
+      <div class="dashboard-box">
+        <h2 style="margin-top: 0;">Study Tasks</h2>
+        <input type="text" id="taskInput" placeholder="Enter subject or topic">
+        <button onclick="addTask()">Add Task</button>
+        <ul id="taskList"></ul>
+      </div>
+
+      <!-- Timer Section -->
+      <div class="dashboard-box">
+        <h2 style="margin-top: 0;">Study Timer</h2>
+        <div class="timer-stats" style="display:flex; justify-content:space-around; margin-bottom: 15px; font-weight: bold; font-size: 1.1rem;">
+          <div>Sessions: <span id="sessionCount" style="color:#1976d2;">0</span></div>
+          <div>Total Time: <span id="totalStudyTimeStr" style="color:#1976d2;">0m</span></div>
+        </div>
+        <div class="timer" style="padding-top: 10px;">
+          <h4 id="timerMode" style="margin:0; color:#1976d2; font-size: 1.2rem; text-transform: uppercase;">Study Mode</h4>
+          <h3 id="time" style="font-size: 3rem; margin: 10px 0;">25:00</h3>
+          <button onclick="startTimer()">Start</button>
+          <button onclick="pauseTimer()">Pause</button>
+          <button onclick="resetTimer()">Reset</button>
+        </div>
+      </div>
+    </div>
+    
+    <div class="dashboard-box" style="margin-top: 20px;">
+      <h2 style="margin-top: 0;">Study Analytics</h2>
+      <div id="stats" style="display:flex; justify-content:space-around; margin-bottom: 20px; font-size: 1.2rem; font-weight: bold;">
+        <div>Total Tasks: <span id="totalTasks" style="color:#1976d2;">0</span></div>
+        <div>Completion: <span id="completionPercent" style="color:#4caf50;">0%</span></div>
+      </div>
+      <div style="display:flex; justify-content:space-around; align-items:center; flex-wrap: wrap; gap: 20px;">
+        <div style="width: 100%; max-width: 400px;">
+          <canvas id="barChart"></canvas>
+        </div>
+        <div style="width: 100%; max-width: 300px;">
+          <canvas id="pieChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Floating AI Mascot & Chat Window -->
+  <div class="ai-mascot-container">
+    <div class="chat-dialog" id="chatDialog">
+      <div style="display:flex; justify-content:space-between; align-items:center; background:#1976d2; color:white; padding:10px 15px; border-radius: 12px 12px 0 0;">
+        <h3 style="margin:0; font-size:16px;">🤖 AI Study Buddy</h3>
+        <button onclick="toggleChat(event)" style="background:transparent; color:white; border:none; cursor:pointer; font-size:16px;">✖</button>
+      </div>
+      <div style="padding: 15px;">
+        <div id="chatBox" class="chat-box" style="height: 300px;"></div>
+        <div class="chat-input-area" style="display:flex; gap:10px; margin-top:15px; justify-content:center;">
+          <input type="text" id="chatInput" placeholder="Ask for study advice..." style="width: 70%; padding: 10px; border:1px solid #ccc; border-radius: 4px;" onkeypress="handleChatKeyPress(event)">
+          <button onclick="sendChat()" style="width: 25%;">Send</button>
+        </div>
+      </div>
+    </div>
+    <img src="robot_mascot.png" alt="AI Mascot" class="ai-mascot" onclick="toggleChat(event)">
+  </div>
+
+  <script src="dashboard.js"></script>
+</body>
+</html>

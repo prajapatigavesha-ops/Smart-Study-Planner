@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Smart Study Planner</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <script src="theme.js"></script>
+  <link rel="stylesheet" href="./style.css">
+  <link rel="icon" href="data:,">
+</head>
+<body onload="startApp()">
+  <!-- Navbar -->
+  <nav>
+    <h1>StudyPlanner</h1>
+    <div>
+      <button onclick="toggleTheme()" class="theme-toggle" style="background:transparent; border:1px solid #1976d2; border-radius:4px; margin-right:5px;">🌓 Dark Mode</button>
+      <a href="login.html"><button style="cursor:pointer;">Login</button></a>
+      <a href="signup.html"><button class="signup" style="cursor:pointer;">Sign Up</button></a>
+    </div>
+  </nav>
+
+  <!-- Hero Section -->
+  <section class="hero">
+    <h2>Smart Study Planner with Analytics</h2>
+    <p>Plan your studies, track your progress, and boost productivity.</p>
+    <button onclick="window.location.href=localStorage.getItem('token')?'dashboard.html':'signup.html'">
+  Get Started
+</button>
+  </section>
+
+  <!-- Features -->
+  <section class="features">
+    <div class="card">
+      <h3>📅 Task Planner</h3>
+      <p>Organize subjects and deadlines.</p>
+    </div>
+
+    <div class="card">
+      <h3>⏱ Study Timer</h3>
+      <p>Use Pomodoro technique.</p>
+    </div>
+
+    <div class="card">
+      <h3>📊 Analytics</h3>
+      <p>Track your performance.</p>
+    </div>
+
+    <div class="card">
+      <h3>🧠 Smart Suggestions</h3>
+      <p>Improve based on insights.</p>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <p>© 2026 Smart Study Planner</p>
+  </footer>
+
+  <!-- Floating AI Mascot -->
+  <div class="ai-mascot-container" onclick="toggleSpeechBubble()">
+    <div class="speech-bubble" id="speechBubble">
+      Hi! I'm your AI Study Buddy.<br><a href="login.html" style="color:#1976d2; font-weight:bold; text-decoration:none;">Log in</a> to chat!
+    </div>
+    <img src="robot_mascot.png" alt="AI Mascot" class="ai-mascot">
+  </div>
+
+  <script src="script.js"></script>
+  <script>
+    function toggleSpeechBubble() {
+      const bubble = document.getElementById('speechBubble');
+      bubble.style.display = bubble.style.display === 'block' ? 'none' : 'block';
+    }
+    // Auto show speech bubble after 2 seconds
+    setTimeout(() => {
+        const bubble = document.getElementById('speechBubble');
+        if (bubble.style.display !== 'block') {
+            bubble.style.display = 'block';
+        }
+    }, 2000);
+  </script>
+</body>
+</html>

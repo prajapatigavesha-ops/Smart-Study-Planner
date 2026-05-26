@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Sign Up - Smart Study Planner</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./style.css">
+  <script src="theme.js"></script>
+</head>
+<body onload="startApp()">
+  <nav>
+    <h1>StudyPlanner</h1>
+    <div>
+      <a href="index.html"><button style="background:transparent; color:white; border:none; margin-right: 15px; cursor:pointer;">Home</button></a>
+      <a href="login.html"><button style="cursor:pointer;">Login</button></a>
+    </div>
+  </nav>
+  <section class="hero" style="max-width: 400px; margin: 50px auto; padding: 40px;">
+    <h2>Sign Up</h2>
+    <p>Create an account to save your tasks and stats globally.</p>
+    <form id="signupForm" style="display:flex; flex-direction:column; gap:15px; margin-top:20px;">
+      <input type="text" id="username" placeholder="Username" required style="padding:10px; border-radius:4px; border:1px solid #ccc; font-size:16px;">
+      <input type="password" id="password" placeholder="Password" required style="padding:10px; border-radius:4px; border:1px solid #ccc; font-size:16px;">
+      <button type="submit" class="signup" style="padding:10px; font-size:16px; cursor:pointer;">Create Account</button>
+      <p id="errorMsg" style="color:#ff4444; font-size:14px; margin:0;"></p>
+    </form>
+  </section>
+  <script>
+    document.getElementById('signupForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const username = document.getElementById('username').value;
+        const password = document.getElementById('password').value;
+        const errorMsg = document.getElementById('errorMsg');
+        
+        try {
+            const res = await fetch('/auth/signup', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                alert("Account created successfully! Please log in.");
+                window.location.href = 'login.html';
+            } else {
+                errorMsg.innerText = data.error;
+            }
+        } catch (err) {
+            errorMsg.innerText = "Connection error";
+        }
+    });
+  </script>
+</body>
+</html>
