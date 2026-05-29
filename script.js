@@ -1,3 +1,1 @@
-function startApp() {
-  alert("Welcome to Smart Study Planner!");
-}
+// Client-side helper scripts can be placed here if needed in the future.

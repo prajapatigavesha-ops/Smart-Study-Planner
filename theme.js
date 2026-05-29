@@ -1,8 +1,5 @@
-const theme = localStorage.getItem('theme');
+const theme = localStorage.getItem('theme') || 'dark';
 if (theme === 'dark') {
-  document.documentElement.classList.add('dark');
-} else if (theme === null && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-  // auto setup dark if system prefers
   document.documentElement.classList.add('dark');
 }
 

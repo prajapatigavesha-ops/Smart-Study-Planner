@@ -19,17 +19,20 @@ function logout() {
 
 // Ensure there is a logout button injected into the nav
 document.addEventListener("DOMContentLoaded", () => {
-    const navDiv = document.querySelector('nav div');
+    const navDiv = document.getElementById('navButtons') || document.querySelector('nav div');
     if (navDiv && !document.getElementById('logoutBtn')) {
         const logoutBtn = document.createElement('button');
         logoutBtn.id = 'logoutBtn';
         logoutBtn.innerText = 'Log Out';
-        logoutBtn.style.cssText = "background:transparent; color:#fff; border:1px solid #ff4444; margin-left:15px; cursor:pointer;";
+        logoutBtn.style.cssText = "background:transparent; color:var(--danger-color); border:1px solid var(--danger-color); padding: 8px 16px; cursor:pointer; border-radius:50px; font-family: var(--font-body); font-weight: 600; font-size: 0.85rem; margin-left: 5px;";
         logoutBtn.onclick = logout;
         navDiv.appendChild(logoutBtn);
     }
     fetchTasks();
     fetchStats();
+    if (typeof renderSpacedRepetition === 'function') {
+        renderSpacedRepetition();
+    }
 });
 
 let tasks = [];
@@ -66,32 +69,64 @@ async function saveStats() {
     } catch(err) { console.error(err); }
 }
 
+const timelineSlots = ["08:00", "10:00", "12:00", "14:00", "16:00", "18:00", "20:00"];
+const taskSlotsMap = JSON.parse(localStorage.getItem('taskSlots') || '{}');
+
 function renderTasks() {
-  const taskList = document.getElementById("taskList");
-  if (!taskList) return;
-  taskList.innerHTML = "";
+  const timelineList = document.getElementById("timelineList");
+  if (!timelineList) return;
+  timelineList.innerHTML = "";
   
-  // Reset analytics data
-  subjects = {};
-
+  // Ensure every task has a slotIndex
   tasks.forEach((task, index) => {
-    const li = document.createElement("li");
-    li.innerHTML = `
-      <span onclick="toggleTask(${index})" class="${task.completed ? 'completed' : ''}">${task.text}</span>
-      <button onclick="deleteTask(${index})">❌</button>
-    `;
-    taskList.appendChild(li);
-
-    // Calculate analytics for completed tasks
-    if (task.completed) {
-      if (!subjects[task.text]) subjects[task.text] = 0;
-      subjects[task.text]++;
+    if (taskSlotsMap[task.id] === undefined) {
+      taskSlotsMap[task.id] = index % timelineSlots.length;
     }
   });
+  localStorage.setItem('taskSlots', JSON.stringify(taskSlotsMap));
 
+  // Sort tasks chronologically by slotIndex
+  const sortedTasks = [...tasks].sort((a, b) => {
+    return (taskSlotsMap[a.id] || 0) - (taskSlotsMap[b.id] || 0);
+  });
+
+  if (sortedTasks.length === 0) {
+    timelineList.innerHTML = `<div style="color:var(--text-secondary); text-align:center; padding: 20px; font-style:italic; font-size:0.95rem;">No tasks scheduled on your timeline. Add topics above!</div>`;
+  } else {
+    sortedTasks.forEach((task) => {
+      const slotIndex = taskSlotsMap[task.id] !== undefined ? taskSlotsMap[task.id] : 0;
+      const slotTime = timelineSlots[slotIndex];
+      
+      const itemDiv = document.createElement("div");
+      itemDiv.className = `timeline-item ${task.completed ? 'completed' : ''}`;
+      itemDiv.innerHTML = `
+        <div class="timeline-time ${task.completed ? 'completed' : ''}">
+          🕒 ${slotTime}
+        </div>
+        <div class="timeline-card ${task.completed ? 'completed' : ''}">
+          <div class="timeline-card-content">
+            <div class="timeline-checkbox ${task.completed ? 'checked' : ''}" onclick="toggleTaskById(${task.id})">
+              ${task.completed ? '✓' : ''}
+            </div>
+            <span class="timeline-task-text ${task.completed ? 'completed' : ''}">${task.text}</span>
+          </div>
+          <div class="timeline-actions">
+            <button class="timeline-btn reschedule-btn" onclick="rescheduleTask(${task.id})" title="Reschedule slot">🔄</button>
+            <button class="timeline-btn delete-btn" onclick="deleteTaskById(${task.id})" title="Delete Task">❌</button>
+          </div>
+        </div>
+      `;
+      timelineList.appendChild(itemDiv);
+    });
+  }
+
+  // Update layout and statistics
   if (typeof updateChart === 'function') {
     updateChart();
   }
+  updateGoalProgressRing();
+  generateHeatmap();
+  generateAIBriefing();
 }
 
 async function addTask() {
@@ -107,6 +142,11 @@ async function addTask() {
       });
       if (res.ok) {
           const newTask = await res.json();
+          // Assign next available slot to new task
+          const nextSlotIndex = tasks.length % timelineSlots.length;
+          taskSlotsMap[newTask.id] = nextSlotIndex;
+          localStorage.setItem('taskSlots', JSON.stringify(taskSlotsMap));
+          
           tasks.push(newTask);
           renderTasks();
           input.value = "";
@@ -114,16 +154,17 @@ async function addTask() {
   } catch(err) { console.error(err); }
 }
 
-async function toggleTask(index) {
-  const task = tasks[index];
+async function toggleTaskById(id) {
+  const task = tasks.find(t => t.id === id);
+  if (!task) return;
   const newStatus = !task.completed;
   
-  // Optimistic UI update
+  // Optimistic update
   task.completed = newStatus;
   renderTasks();
   
   try {
-      await fetch(`/api/tasks/${task.id}`, {
+      await fetch(`/api/tasks/${id}`, {
           method: 'PUT',
           headers: getAuthHeaders(),
           body: JSON.stringify({ completed: newStatus })
@@ -131,18 +172,32 @@ async function toggleTask(index) {
   } catch(err) { console.error(err); }
 }
 
-async function deleteTask(index) {
-  const task = tasks[index];
-  // Optimistic UI update
+async function deleteTaskById(id) {
+  const index = tasks.findIndex(t => t.id === id);
+  if (index === -1) return;
+  
+  // Remove slot mapping
+  delete taskSlotsMap[id];
+  localStorage.setItem('taskSlots', JSON.stringify(taskSlotsMap));
+  
+  // Optimistic update
   tasks.splice(index, 1);
   renderTasks();
   
   try {
-      await fetch(`/api/tasks/${task.id}`, {
+      await fetch(`/api/tasks/${id}`, {
           method: 'DELETE',
           headers: getAuthHeaders()
       });
   } catch(err) { console.error(err); }
+}
+
+function rescheduleTask(id) {
+  const currentSlot = taskSlotsMap[id] !== undefined ? taskSlotsMap[id] : 0;
+  const nextSlot = (currentSlot + 1) % timelineSlots.length;
+  taskSlotsMap[id] = nextSlot;
+  localStorage.setItem('taskSlots', JSON.stringify(taskSlotsMap));
+  renderTasks();
 }
 
 let mode = 'study';
@@ -165,8 +220,12 @@ function updateTimerStats() {
   const timerModeEl = document.getElementById("timerMode");
   if (timerModeEl) {
       timerModeEl.innerText = mode === 'study' ? "Study Mode" : "Break Mode";
-      timerModeEl.style.color = mode === 'study' ? "#1976d2" : "#4caf50";
+      timerModeEl.style.color = mode === 'study' ? "var(--accent-indigo)" : "var(--accent-mint)";
   }
+
+  updateGoalProgressRing();
+  generateHeatmap();
+  generateAIBriefing();
 }
 
 function playAlarm() {
@@ -243,66 +302,191 @@ function updateDisplay() {
   if (timeEl) timeEl.innerText = `${minutes}:${seconds < 10 ? "0" : ""}${seconds}`;
 }
 
-let barChartInstance;
-let pieChartInstance;
+let weeklyChartInstance;
 
 function updateChart() {
   const totalTasksCount = tasks.length;
   const completedTasksCount = tasks.filter(t => t.completed).length;
-  const pendingTasksCount = totalTasksCount - completedTasksCount;
-  
   const completionPercent = totalTasksCount === 0 ? 0 : Math.round((completedTasksCount / totalTasksCount) * 100);
 
   const totalEl = document.getElementById("totalTasks");
   if (totalEl) totalEl.innerText = totalTasksCount;
   
   const compEl = document.getElementById("completionPercent");
-  if (compEl) compEl.innerText = completionPercent + "%";
+  if (compEl) compEl.innerText = completionPercent + "% Complete";
 
-  const barCtxEl = document.getElementById("barChart");
-  if (!barCtxEl) return;
-  const barCtx = barCtxEl.getContext("2d");
-  
-  const pieCtxEl = document.getElementById("pieChart");
-  if (!pieCtxEl) return;
-  const pieCtx = pieCtxEl.getContext("2d");
-
-  if (barChartInstance) barChartInstance.destroy();
-  if (pieChartInstance) pieChartInstance.destroy();
+  if (typeof Chart === 'undefined') return;
 
   const isDark = document.documentElement.classList.contains('dark');
-  if (typeof Chart !== 'undefined') {
-      Chart.defaults.color = isDark ? '#e0e0e0' : '#666';
+  const textColor = isDark ? '#e2e8f0' : '#0f172a';
+  const gridColor = isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)';
+  const pointBg = isDark ? '#020617' : '#ffffff';
 
-      barChartInstance = new Chart(barCtx, {
-        type: "bar",
-        data: {
-          labels: Object.keys(subjects),
-          datasets: [{
-            label: "Tasks Completed",
-            data: Object.values(subjects),
-            backgroundColor: "#1976d2",
-            borderWidth: 1
-          }]
-        },
-        options: {
-          scales: {
-            y: { beginAtZero: true, ticks: { precision: 0 } }
+  Chart.defaults.color = textColor;
+  Chart.defaults.font.family = "'Inter', sans-serif";
+
+  if (weeklyChartInstance) weeklyChartInstance.destroy();
+
+  // --- WEEKLY FOCUS AREA CHART ---
+  const weeklyCtxEl = document.getElementById("weeklyOverviewChart");
+  if (weeklyCtxEl) {
+      const weeklyCtx = weeklyCtxEl.getContext("2d");
+      
+      const focusGradient = weeklyCtx.createLinearGradient(0, 0, 0, 160);
+      focusGradient.addColorStop(0, isDark ? 'rgba(99, 102, 241, 0.4)' : 'rgba(79, 70, 229, 0.35)');
+      focusGradient.addColorStop(1, 'rgba(79, 70, 229, 0.0)');
+
+      weeklyChartInstance = new Chart(weeklyCtx, {
+          type: 'line',
+          data: {
+              labels: window.studentMetricsController.getWeeklyLabels(),
+              datasets: [
+                  {
+                      label: 'Focus Time (mins)',
+                      data: window.studentMetricsController.getWeeklyFocus(),
+                      borderColor: isDark ? '#818cf8' : '#4f46e5',
+                      borderWidth: 3,
+                      fill: true,
+                      backgroundColor: focusGradient,
+                      tension: 0.4,
+                      pointBackgroundColor: isDark ? '#818cf8' : '#4f46e5',
+                      pointBorderColor: pointBg,
+                      pointHoverRadius: 7,
+                      pointRadius: 5
+                  },
+                  {
+                      label: 'Daily Target (mins)',
+                      data: window.studentMetricsController.getWeeklyTarget(),
+                      borderColor: isDark ? 'rgba(148, 163, 184, 0.4)' : 'rgba(71, 85, 105, 0.4)',
+                      borderWidth: 2,
+                      borderDash: [5, 5],
+                      fill: false,
+                      tension: 0.1,
+                      pointRadius: 0
+                  }
+              ]
+          },
+          options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: {
+                  legend: {
+                      position: 'top',
+                      labels: { boxWidth: 12, usePointStyle: true, pointStyle: 'circle', font: { size: 10 } }
+                  }
+              },
+              scales: {
+                  x: { grid: { color: gridColor }, ticks: { font: { size: 9 } } },
+                  y: { beginAtZero: true, grid: { color: gridColor }, ticks: { font: { size: 9 } } }
+              }
           }
-        }
       });
+  }
+}
 
-      pieChartInstance = new Chart(pieCtx, {
-        type: "pie",
-        data: {
-          labels: ["Completed", "Pending"],
-          datasets: [{
-            data: [completedTasksCount, pendingTasksCount],
-            backgroundColor: ["#4caf50", "#f44336"],
-            borderWidth: 1
-          }]
-        }
-      });
+/* --- SVG GOAL PROGRESS RING ANIMATOR --- */
+function updateGoalProgressRing() {
+  const targetMinutes = 150;
+  const studyMins = Math.floor(totalStudyTime / 60);
+  const percent = Math.min(100, Math.round((studyMins / targetMinutes) * 100));
+  
+  const percentEl = document.getElementById("dailyGoalPercent");
+  if (percentEl) percentEl.innerText = percent;
+  
+  const circle = document.getElementById("goalProgressCircle");
+  if (circle) {
+      const circumference = 314.16; // 2 * Math.PI * r (r=50)
+      const offset = circumference - (percent / 100) * circumference;
+      circle.style.strokeDashoffset = offset;
+  }
+}
+
+/* --- GITHUB STYLE ACTIVITY STREAK HEATMAP --- */
+function generateHeatmap() {
+  const matrix = document.getElementById("heatmapMatrix");
+  if (!matrix) return;
+  matrix.innerHTML = "";
+  
+  // Seed with 34 days of past study levels (0 to 3), current day is index 35.
+  const pastLevels = [
+      0, 1, 2, 0, 3, 2, 1,
+      0, 0, 1, 2, 3, 0, 1,
+      2, 1, 0, 2, 3, 2, 1,
+      0, 1, 1, 2, 0, 3, 2,
+      1, 2, 0, 3, 3, 2
+  ];
+  
+  // Today's streak intensity based on session count completed
+  let todayLevel = 0;
+  if (sessionsCompleted >= 3) todayLevel = 3;
+  else if (sessionsCompleted === 2) todayLevel = 2;
+  else if (sessionsCompleted === 1) todayLevel = 1;
+  
+  const levels = [...pastLevels, todayLevel];
+  
+  levels.forEach((level, idx) => {
+      const cell = document.createElement("div");
+      const isToday = idx === levels.length - 1;
+      
+      cell.className = `heatmap-cell streak-level-${level} ${isToday ? 'today-cell' : ''}`;
+      
+      let dayLabel;
+      if (isToday) {
+          dayLabel = "Today";
+      } else {
+          dayLabel = `Day -${levels.length - 1 - idx}`;
+      }
+      
+      const mins = level === 3 ? "75+ mins" : level === 2 ? "50 mins" : level === 1 ? "25 mins" : "0 mins";
+      cell.setAttribute("data-tooltip", `${dayLabel}: Study level ${level} (${mins})`);
+      matrix.appendChild(cell);
+  });
+}
+
+/* --- AI DYNAMIC DAILY BRIEFING GENERATOR --- */
+function generateAIBriefing() {
+  const briefingText = document.getElementById("briefingText");
+  const briefingStatus = document.getElementById("briefingStatus");
+  const briefingTarget = document.getElementById("briefingTarget");
+  const briefingStreak = document.getElementById("briefingStreak");
+  
+  if (!briefingText) return;
+  
+  const pendingTasks = tasks.filter(t => !t.completed).length;
+  const completedTasks = tasks.filter(t => t.completed).length;
+  const studyMins = Math.floor(totalStudyTime / 60);
+  
+  let statusStr = "Focusing";
+  let statusColor = "var(--accent-indigo)";
+  let brief = "";
+  
+  if (pendingTasks === 0 && completedTasks > 0) {
+      statusStr = "Accomplished";
+      statusColor = "var(--accent-mint)";
+      brief = "Outstanding! You have completed all scheduled tasks on your timeline today. Keep this momentum high to secure your next study streak!";
+  } else if (studyMins >= 150) {
+      statusStr = "Goal Reached";
+      statusColor = "var(--accent-mint)";
+      brief = `Excellent work! You reached your daily study target of 150 mins (Total: ${studyMins}m). You still have ${pendingTasks} task(s) on your timeline. Let's finish strong!`;
+  } else if (completedTasks > 0) {
+      brief = `Great progress. You completed ${completedTasks} timeline task(s) and logged ${studyMins} minutes of focus. Peak productivity is forecast for your afternoon blocks.`;
+  } else if (pendingTasks > 0) {
+      brief = `Good morning! Your timeline schedule is optimized. You have ${pendingTasks} topics scheduled today. Begin a Pomodoro timer session to kick off.`;
+  } else {
+      brief = "Your study timeline is empty! Schedule a topic above (e.g. History Chapter 2 or React Hooks) to compile your daily AI briefing details.";
+  }
+  
+  briefingText.innerText = brief;
+  if (briefingStatus) {
+      briefingStatus.innerText = statusStr;
+      briefingStatus.style.color = statusColor;
+  }
+  if (briefingTarget) {
+      briefingTarget.innerText = "150m";
+  }
+  if (briefingStreak) {
+      const streakDays = sessionsCompleted > 0 ? 5 : 4;
+      briefingStreak.innerText = `${streakDays} Days`;
   }
 }
 
@@ -361,3 +545,101 @@ function appendChatMessage(text, sender) {
     chatBox.appendChild(msgDiv);
     chatBox.scrollTop = chatBox.scrollHeight;
 }
+
+/**
+ * Renders the Spaced Repetition mastery simulator controls and scheduled preview timelines
+ */
+function renderSpacedRepetition() {
+    const topicsList = document.getElementById("srTopicsList");
+    if (topicsList) {
+        topicsList.innerHTML = "";
+        window.studyTopics.forEach(topic => {
+            const row = document.createElement("div");
+            row.className = `topic-mastery-row ${topic.mastered ? 'mastered' : ''}`;
+            row.innerHTML = `
+                <div style="display:flex; flex-direction:column; gap:4px; align-items:flex-start; text-align:left;">
+                    <span class="step-badge" style="background:rgba(99,102,241,0.1); color:var(--accent-indigo); font-size:0.65rem; padding: 2px 8px; border-radius:6px; border:1px solid rgba(99,102,241,0.2); font-weight:800; text-transform:uppercase;">
+                        ${topic.grade}
+                    </span>
+                    <span class="topic-name-label" style="font-size:1.02rem; font-weight:800; margin-top:2px;">
+                        ${topic.subject}
+                    </span>
+                    <span style="font-size:0.82rem; color:var(--text-secondary);">
+                        ${topic.topic}
+                    </span>
+                </div>
+                ${topic.mastered 
+                  ? `<button class="btn-master completed" style="pointer-events:none;">Mastered ✓</button>`
+                      : `<div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                           <a href="/feynman?topicId=${topic.id}"><button class="btn-master-outline">🎓 Practice Feynman Mode</button></a>
+                           <button class="btn-master" onclick="window.markTopicAsMastered('${topic.id}')">Mark Mastered</button>
+                         </div>`
+                }
+            `;
+            topicsList.appendChild(row);
+        });
+    }
+    
+    const reviewsList = document.getElementById("srReviewsList");
+    if (reviewsList) {
+        reviewsList.innerHTML = "";
+        
+        if (window.calendarStore.length === 0) {
+            reviewsList.innerHTML = `<div style="color:var(--text-secondary); text-align:center; padding: 20px; font-style:italic; font-size:0.88rem;">No reviews scheduled. Mark a topic as mastered above to trigger spaced schedule intervals!</div>`;
+        } else {
+            const sortedEvents = [...window.calendarStore].sort((a, b) => {
+                return new Date(a.startDateTime) - new Date(b.startDateTime);
+            });
+            
+            sortedEvents.forEach(evt => {
+                const dateObj = new Date(evt.startDateTime);
+                const formattedDate = dateObj.toLocaleDateString(undefined, { 
+                    month: 'short', 
+                    day: 'numeric', 
+                    year: 'numeric' 
+                }) + ` at 9:00 AM`;
+                
+                const card = document.createElement("div");
+                card.className = "review-schedule-card animate-fade-in-up stagger-1";
+                card.innerHTML = `
+                    <div class="review-card-info">
+                        <span class="review-card-title">${evt.title}</span>
+                        <span class="review-card-date">📅 ${formattedDate}</span>
+                    </div>
+                    <span class="step-badge step-badge-${evt.intervalStep}">
+                        Step ${evt.intervalStep}
+                    </span>
+                `;
+                reviewsList.appendChild(card);
+            });
+        }
+    }
+}
+
+/**
+ * Captures submission on the spaced repetition form, inserts it into state, and resets inputs
+ */
+function handleSRAddTopic(e) {
+    e.preventDefault();
+    const subjectInput = document.getElementById("srSubject");
+    const topicInput = document.getElementById("srTopic");
+    const gradeInput = document.getElementById("srGrade");
+    
+    if (!subjectInput || !topicInput || !gradeInput) return;
+    
+    const subject = subjectInput.value.trim();
+    const topic = topicInput.value.trim();
+    const grade = gradeInput.value.trim();
+    
+    if (!subject || !topic || !grade) return;
+    
+    window.addNewTopic(subject, topic, grade);
+    
+    // Reset form fields
+    subjectInput.value = "";
+    topicInput.value = "";
+    gradeInput.value = "";
+}
+
+window.handleSRAddTopic = handleSRAddTopic;
+window.renderSpacedRepetition = renderSpacedRepetition;

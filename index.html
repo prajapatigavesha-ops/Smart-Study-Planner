@@ -3,80 +3,290 @@
 <head>
   <meta charset="UTF-8">
   <title>Smart Study Planner</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;800&display=swap" rel="stylesheet">
   <script src="theme.js"></script>
-  <link rel="stylesheet" href="./style.css">
+  <link rel="stylesheet" href="style.css">
   <link rel="icon" href="data:,">
 </head>
-<body onload="startApp()">
-  <!-- Navbar -->
-  <nav>
-    <h1>StudyPlanner</h1>
-    <div>
-      <button onclick="toggleTheme()" class="theme-toggle" style="background:transparent; border:1px solid #1976d2; border-radius:4px; margin-right:5px;">🌓 Dark Mode</button>
-      <a href="login.html"><button style="cursor:pointer;">Login</button></a>
-      <a href="signup.html"><button class="signup" style="cursor:pointer;">Sign Up</button></a>
+<body>
+
+  <!-- Fullscreen video background -->
+  <video class="video-background" autoplay loop muted playsinline>
+    <source src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260314_131748_f2ca2a28-fed7-44c8-b9a9-bd9acdd5ec31.mp4" type="video/mp4">
+  </video>
+
+  <!-- Page contents wrapper -->
+  <div class="content-wrapper">
+
+    <!-- Navigation Bar -->
+    <nav class="relative z-10 flex row justify-between px-8 py-6 max-w-7xl mx-auto items-center" style="background: transparent; border-bottom: none; box-shadow: none;">
+      <div class="flex items-center">
+        <h1 class="text-xl tracking-tight text-foreground cursor-pointer" style="font-family: var(--font-body); font-weight: 600; margin: 0;" onclick="switchView('home')">Smart Study Planner</h1>
+      </div>
+      <div class="hidden md:flex items-center gap-8 text-sm"></div>
+      <div id="navAuthLinks" class="flex items-center gap-4">
+        <button onclick="switchView('home')" id="homeNavBtn" style="padding: 8px 16px; cursor: pointer; background:transparent; border:none; color: var(--text-secondary); font-size: 0.85rem; font-family: var(--font-body); font-weight: 600; display: none;">Home</button>
+        <a href="login.html" id="loginBtnLink" style="text-decoration: none;"><button id="loginBtn" style="cursor:pointer; background:transparent; border:none; color: var(--text-primary); font-size: 0.85rem; padding: 8px 16px; font-family: var(--font-body); font-weight: 600;">Login</button></a>
+        <a href="signup.html" id="signupBtnLink" style="text-decoration: none;"><button id="signupBtn" class="liquid-glass rounded-full px-6 py-2.5 text-sm text-foreground hover:scale-[1.03]" style="cursor:pointer; border-radius: 50px; font-family: var(--font-body); font-weight: 600;">Begin Journey</button></a>
+      </div>
+    </nav>
+
+    <!-- ==================== VIEW 1: HOME VIEW (LANDING PAGE) ==================== -->
+    <div id="homeView" style="padding-top: 10px; display: flex; flex-direction: column; justify-content: space-between; min-height: 75vh;">
+      
+      <!-- Center Quote Typography Section -->
+      <div class="animate-fade-rise flex flex-col items-center justify-center text-center px-6 py-12 max-w-4xl mx-auto" style="flex: 1; display: flex; justify-content: center; align-items: center; min-height: 250px;">
+        <p style="font-family: 'Instrument Serif', serif; font-size: 2.4rem; font-style: italic; font-weight: 300; line-height: 1.35; color: hsl(var(--foreground)); text-shadow: 0 2px 10px rgba(0, 0, 0, 0.4); max-width: 800px; margin: 0 auto 16px auto;">
+          "Planning is bringing the future into the present so that you can do something about it now."
+        </p>
+        <span style="font-family: var(--font-body); font-size: 0.9rem; font-weight: 500; letter-spacing: 0.05em; text-transform: uppercase; color: hsl(var(--muted-foreground)); opacity: 0.8;">
+          – Alan Lakein
+        </span>
+      </div>
+
+      <!-- Features (Core cards positioned in the lower portion) -->
+      <section class="features animate-fade-rise-delay" style="cursor: pointer; margin-top: auto; margin-bottom: 20px; width: 100%;">
+        <div class="card" onclick="switchView('dashboard')">
+          <h3>📅 Task Planner</h3>
+          <p>Organize subjects and deadlines.</p>
+        </div>
+
+        <div class="card" onclick="switchView('dashboard')">
+          <h3>⏱ Study Timer</h3>
+          <p>Use Pomodoro technique.</p>
+        </div>
+
+        <div class="card" onclick="switchView('dashboard')">
+          <h3>📊 Analytics</h3>
+          <p>Track your performance.</p>
+        </div>
+
+        <div class="card" onclick="switchView('dashboard')">
+          <h3>🧠 Smart Suggestions</h3>
+          <p>Improve based on insights.</p>
+        </div>
+      </section>
+
+      <!-- Footer (Subtle footer layout) -->
+      <footer style="margin-top: 40px; padding: 20px 0; border-top: 1px solid rgba(255, 255, 255, 0.05); text-align: center; opacity: 0.5;">
+      </footer>
+
+    <!-- Floating AI Mascot -->
+    <div class="ai-mascot-container" onclick="toggleSpeechBubble()">
+      <div class="speech-bubble" id="speechBubble">
+        Hi! I'm your AI Study Buddy.<br><a href="login.html" style="color:#1976d2; font-weight:bold; text-decoration:none;">Log in</a> to chat!
+      </div>
+      <img src="robot_mascot.png" alt="AI Mascot" class="ai-mascot">
     </div>
-  </nav>
-
-  <!-- Hero Section -->
-  <section class="hero">
-    <h2>Smart Study Planner with Analytics</h2>
-    <p>Plan your studies, track your progress, and boost productivity.</p>
-    <button onclick="window.location.href=localStorage.getItem('token')?'dashboard.html':'signup.html'">
-  Get Started
-</button>
-  </section>
-
-  <!-- Features -->
-  <section class="features">
-    <div class="card">
-      <h3>📅 Task Planner</h3>
-      <p>Organize subjects and deadlines.</p>
-    </div>
-
-    <div class="card">
-      <h3>⏱ Study Timer</h3>
-      <p>Use Pomodoro technique.</p>
-    </div>
-
-    <div class="card">
-      <h3>📊 Analytics</h3>
-      <p>Track your performance.</p>
-    </div>
-
-    <div class="card">
-      <h3>🧠 Smart Suggestions</h3>
-      <p>Improve based on insights.</p>
-    </div>
-  </section>
-
-  <!-- Footer -->
-  <footer>
-    <p>© 2026 Smart Study Planner</p>
-  </footer>
-
-  <!-- Floating AI Mascot -->
-  <div class="ai-mascot-container" onclick="toggleSpeechBubble()">
-    <div class="speech-bubble" id="speechBubble">
-      Hi! I'm your AI Study Buddy.<br><a href="login.html" style="color:#1976d2; font-weight:bold; text-decoration:none;">Log in</a> to chat!
-    </div>
-    <img src="robot_mascot.png" alt="AI Mascot" class="ai-mascot">
   </div>
 
-  <script src="script.js"></script>
+  <!-- ==================== VIEW 2: DASHBOARD VIEW (3-COLUMN DASHBOARD) ==================== -->
+  <div id="dashboardView" style="display: none;">
+    
+    <!-- Local saving notification banner -->
+    <div class="local-banner" id="localBanner" style="display: none;">
+      <span>☁️ Running in Local Mode.</span>
+      <a href="login.html">Log In</a> or <a href="signup.html">Sign Up</a> to synchronize your study progress across devices!
+    </div>
+
+    <!-- 3-Column Layout Container -->
+    <div class="home-dashboard-container">
+      
+      <!-- Background Radial Indigo Glow Aura -->
+      <div class="radial-glow-aura"></div>
+      
+      <!-- Left Column (30% width) -->
+      <div class="dashboard-box" style="display:flex; flex-direction:column; gap:20px; text-align:left;">
+        <h2 style="margin: 0; font-size: 1.35rem; font-weight: 800; border-bottom: 1px solid var(--glass-border); padding-bottom: 12px; margin-bottom: 5px;">🧠 Add Spaced Topic</h2>
+        
+        <!-- Topic Management Form -->
+        <form id="srAddTopicForm" style="display:flex; flex-direction:column; gap:12px;" onsubmit="handleSRAddTopic(event)">
+          <input type="text" id="srSubject" placeholder="Subject Name (e.g. Maths, Biology)" required style="width:100%; box-sizing:border-box;">
+          <input type="text" id="srTopic" placeholder="Specific Topic (e.g. Quadratic Equations)" required style="width:100%; box-sizing:border-box;">
+          <input type="text" id="srGrade" placeholder="Class / Grade Level (e.g. Class 10)" required style="width:100%; box-sizing:border-box;">
+          <button type="submit" class="btn-primary" style="padding: 12px; font-size: 0.95rem; border-radius: 30px; cursor: pointer; width:100%;">+ Add New Topic</button>
+        </form>
+
+        <div style="margin-top: 10px;">
+          <h3 style="margin: 0 0 12px 0; font-size: 1.05rem; font-weight: 700; color: var(--text-secondary);">Topics to Master</h3>
+          <div class="topic-mastery-list" id="srTopicsList" style="max-height: 350px; overflow-y: auto; display:flex; flex-direction:column; gap:10px;">
+            <!-- Active topics list injected dynamically -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Middle Column (45% width) -->
+      <div class="dashboard-box" style="display:flex; flex-direction:column; gap:20px; text-align:left; position:relative;">
+        <h2 style="margin: 0; font-size: 1.35rem; font-weight: 800; border-bottom: 1px solid var(--glass-border); padding-bottom: 12px; margin-bottom: 5px;">📅 Spaced Review Timeline</h2>
+        
+        <p style="margin: 0; color: var(--text-secondary); font-size: 0.88rem; line-height: 1.4;">
+          Below is your automatically generated active recall interval schedule (1-3-7-30 day intervals). Review these topics to solidify knowledge.
+        </p>
+
+        <div class="reviews-timeline-wrapper" id="srReviewsList" style="max-height: 600px; overflow-y: auto; flex: 1;">
+          <!-- Timeline review events injected dynamically -->
+        </div>
+      </div>
+
+      <!-- Right Column (25% width) -->
+      <div style="display:flex; flex-direction:column; gap:24px;">
+        
+        <!-- Pomodoro Timer Box -->
+        <div class="dashboard-box" style="text-align:left;">
+          <h2 style="margin: 0; font-size: 1.25rem; font-weight: 800; border-bottom: 1px solid var(--glass-border); padding-bottom: 12px; margin-bottom: 15px;">⏱️ Pomodoro Focus</h2>
+          <div class="timer-stats" style="display:flex; justify-content:space-between; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 15px;">
+            <div>Sessions: <span id="sessionCount" style="color:var(--accent-indigo); font-weight:bold;">0</span></div>
+            <div>Total: <span id="totalStudyTimeStr" style="color:var(--accent-indigo); font-weight:bold;">0m</span></div>
+          </div>
+          <div class="timer" style="text-align: center;">
+            <h4 id="timerMode" style="margin:0; font-size: 0.95rem; text-transform: uppercase; font-weight:700;">Study Mode</h4>
+            <h3 id="time" style="font-size: 2.8rem; margin: 10px 0; font-weight:800;">25:00</h3>
+            <div style="display:flex; gap:8px; justify-content:center;">
+              <button onclick="startTimer()" class="btn-primary" style="padding: 8px 16px; font-size: 0.85rem;">Start</button>
+              <button onclick="pauseTimer()" style="padding: 8px 16px; font-size: 0.85rem;">Pause</button>
+              <button onclick="resetTimer()" style="padding: 8px 16px; font-size: 0.85rem;">Reset</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Streak Tracker Box -->
+        <div class="dashboard-box" style="text-align:left;">
+          <h2 style="margin: 0; font-size: 1.25rem; font-weight: 800; border-bottom: 1px solid var(--glass-border); padding-bottom: 12px; margin-bottom: 15px;">🔥 Study Streak</h2>
+          <div style="display:flex; flex-direction:column; align-items:center; gap: 15px;">
+            <div class="heatmap-grid" id="heatmapMatrix" style="grid-gap: 3px; grid-template-columns: repeat(7, 12px); display:grid; width:fit-content; height:fit-content;">
+              <!-- Streak squares injected dynamically -->
+            </div>
+            <div style="font-size: 0.82rem; font-weight: 600; color: var(--text-secondary); text-align:center;">
+              Complete daily Pomodoro sessions to grow your streak grid!
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- Feynman Focus Overlay Modal -->
+  <div class="feynman-modal-overlay" id="feynmanModal">
+    <div class="feynman-modal-content">
+      <button class="feynman-modal-close" onclick="closeFeynmanModal()">✖</button>
+      
+      <!-- Split layout inside modal -->
+      <div class="feynman-grid" style="margin: 0; padding: 0;">
+        
+        <!-- Left Panel: Explanation Draft -->
+        <div class="workspace-panel" style="text-align:left;">
+          <div class="metadata-card" id="metadataCard" style="margin-bottom: 15px;">
+            <div class="metadata-info" id="activeTopicInfo">
+              <!-- Active topic badge metadata loaded dynamically -->
+            </div>
+          </div>
+          
+          <div class="dashboard-box" style="display:flex; flex-direction:column; gap:12px; background:transparent; border:none; padding:0; box-shadow:none;">
+            <h3 style="margin: 0; font-size: 1.15rem; font-weight: 800; color: var(--text-primary);">Draft Explanation</h3>
+            <p style="margin: 0; color: var(--text-secondary); font-size: 0.86rem; line-height: 1.4;">
+              Explain the topic below in simple terms as if teaching an absolute beginner. Refrain from using technical terms or jargon.
+            </p>
+            
+            <textarea id="explanationDraft" class="feynman-textarea" placeholder="Explain this topic in your own words..." style="min-height: 180px;"></textarea>
+            
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:5px;">
+              <span class="word-counter" id="wordCountLabel" style="font-size:0.85rem; color:var(--text-secondary);">Words: 0 (Min 10 recommended)</span>
+              <button onclick="evaluateExplanation()" class="btn-primary" style="padding:10px 20px; border-radius:30px; cursor:pointer; font-weight:700; font-size:0.88rem;">✨ Evaluate Comprehension</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Panel: Critique View -->
+        <div class="critique-panel" style="text-align:left;">
+          
+          <!-- 1. Default Blank State -->
+          <div class="blank-state-critique" id="blankStateCard" style="display: flex;">
+            <span class="blank-state-icon">✍️</span>
+            <h3 style="margin: 0 0 8px 0; font-size: 1.1rem; font-weight: 800; color: var(--text-primary);">Comprehension Report</h3>
+            <p style="margin: 0; font-size: 0.88rem; line-height: 1.4; color: var(--text-secondary); max-width: 250px; text-align:center;">
+              Write your explanation and click evaluate to receive AI feedback report.
+            </p>
+          </div>
+
+          <!-- 2. Loading Spinner -->
+          <div class="spinner-container" id="loadingStateCard" style="display: none;">
+            <div class="spinner"></div>
+            <h3 style="margin: 0; font-size: 1.05rem; font-weight: 800; color: var(--text-primary);">AI Study Buddy is Reading...</h3>
+            <p style="margin: 0; font-size: 0.85rem; color: var(--text-secondary);">Analyzing vocabulary complexity and logical flow.</p>
+          </div>
+
+          <!-- 3. Critique Results Card -->
+          <div class="dashboard-box" id="resultsStateCard" style="display: none; flex-direction:column; gap:15px; background:transparent; border:none; padding:0; box-shadow:none;">
+            <h3 style="margin: 0; font-size: 1.15rem; font-weight: 800; border-bottom: 1px solid var(--glass-border); padding-bottom: 10px; color: var(--text-primary); text-align:center;">AI Critique Report</h3>
+            
+            <!-- Radial Clarity Ring -->
+            <div style="display:flex; justify-content:center; align-items:center; flex-direction:column;">
+              <div class="progress-ring-container">
+                <svg class="progress-ring" width="100" height="100">
+                  <circle class="progress-ring__circle-bg" stroke="rgba(255,255,255,0.05)" stroke-width="6" fill="transparent" r="42" cx="50" cy="50"/>
+                  <circle class="progress-ring__circle" id="clarityScoreCircle" stroke="var(--accent-indigo)" stroke-width="6" fill="transparent" r="42" cx="50" cy="50" stroke-dasharray="263.89" stroke-dashoffset="263.89"/>
+                </svg>
+                <div class="progress-ring__text" style="font-size: 1.1rem;">
+                  <span id="clarityScorePercent">0</span>%
+                  <span class="progress-ring__subtext" style="font-size: 0.6rem;">Clarity</span>
+                </div>
+              </div>
+              <div style="font-size: 0.8rem; font-weight: 700; color: var(--text-secondary); margin-top: 5px;">Comprehension Score</div>
+            </div>
+
+            <!-- Feedback Alert Cards -->
+            <div style="display:flex; flex-direction:column; gap:10px;">
+              <div class="feedback-card" style="padding: 10px 14px;">
+                <span class="feedback-badge badge-jargon" style="font-size:0.75rem; padding: 2px 6px;">🚨 Complex Jargon Spotted</span>
+                <p style="margin: 4px 0 0 0; font-size: 0.82rem; color: var(--text-secondary);" id="jargonFeedback"></p>
+              </div>
+              <div class="feedback-card" style="padding: 10px 14px;">
+                <span class="feedback-badge badge-gap" style="font-size:0.75rem; padding: 2px 6px;">⚠️ Logical Gaps Found</span>
+                <p style="margin: 4px 0 0 0; font-size: 0.82rem; color: var(--text-secondary);" id="gapFeedback"></p>
+              </div>
+              <div class="feedback-card" style="padding: 10px 14px;">
+                <span class="feedback-badge badge-analogy" style="font-size:0.75rem; padding: 2px 6px;">💡 Recommended Analogy</span>
+                <p style="margin: 4px 0 0 0; font-size: 0.82rem; color: var(--text-secondary);" id="analogyFeedback"></p>
+              </div>
+            </div>
+
+            <!-- Completion Action -->
+            <div style="border-top: 1px solid var(--glass-border); padding-top: 10px;">
+              <button onclick="finalizeMastery()" class="btn-primary" style="background:linear-gradient(135deg, var(--accent-mint), #34d399) !important; color:#020617 !important; font-weight:800; font-size: 0.95rem; width: 100%; border-radius: 30px; padding: 12px 20px; cursor: pointer; border:none; box-shadow:0 6px 15px rgba(16,185,129,0.25);">
+                ✅ Finalize & Lock Mastery
+              </button>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+
   <script>
     function toggleSpeechBubble() {
       const bubble = document.getElementById('speechBubble');
-      bubble.style.display = bubble.style.display === 'block' ? 'none' : 'block';
+      if (bubble) {
+        bubble.style.display = bubble.style.display === 'block' ? 'none' : 'block';
+      }
     }
     // Auto show speech bubble after 2 seconds
     setTimeout(() => {
         const bubble = document.getElementById('speechBubble');
-        if (bubble.style.display !== 'block') {
+        if (bubble && bubble.style.display !== 'block') {
             bubble.style.display = 'block';
         }
     }, 2000);
   </script>
+
+  </div> <!-- End content-wrapper -->
+
+  <script src="spaced-repetition.js"></script>
+  <script src="index-dashboard.js"></script>
 </body>
 </html>

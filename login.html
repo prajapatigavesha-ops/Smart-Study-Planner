@@ -3,24 +3,39 @@
 <head>
   <meta charset="UTF-8">
   <title>Login - Smart Study Planner</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="./style.css">
   <script src="theme.js"></script>
 </head>
-<body onload="startApp()">
-  <nav>
-    <h1>StudyPlanner</h1>
-    <div>
-      <a href="index.html"><button style="background:transparent; color:white; border:none; margin-right: 15px; cursor:pointer;">Home</button></a>
-      <a href="signup.html"><button class="signup" style="cursor:pointer;">Sign Up</button></a>
-    </div>
-  </nav>
-  <section class="hero" style="max-width: 400px; margin: 50px auto; padding: 40px;">
-    <h2>Login</h2>
-    <form id="loginForm" style="display:flex; flex-direction:column; gap:15px; margin-top:20px;">
-      <input type="text" id="username" placeholder="Username" required style="padding:10px; border-radius:4px; border:1px solid #ccc; font-size:16px;">
-      <input type="password" id="password" placeholder="Password" required style="padding:10px; border-radius:4px; border:1px solid #ccc; font-size:16px;">
-      <button type="submit" style="padding:10px; font-size:16px; cursor:pointer;">Log In</button>
+<body>
+
+  <!-- Fullscreen background video -->
+  <video class="video-background" autoplay loop muted playsinline>
+    <source src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260314_131748_f2ca2a28-fed7-44c8-b9a9-bd9acdd5ec31.mp4" type="video/mp4">
+  </video>
+
+  <!-- Content wrapper -->
+  <div class="content-wrapper">
+
+    <!-- Navigation Bar -->
+    <nav class="relative z-10 flex row justify-between px-8 py-6 max-w-7xl mx-auto items-center" style="background: transparent; border-bottom: none; box-shadow: none;">
+      <div class="flex items-center">
+        <h1 class="text-xl tracking-tight text-foreground cursor-pointer" style="font-family: var(--font-body); font-weight: 600; margin: 0;" onclick="window.location.href='index.html'">Smart Study Planner</h1>
+      </div>
+      <div class="hidden md:flex items-center gap-8 text-sm"></div>
+      <div class="flex items-center gap-2">
+        <button onclick="toggleTheme()" class="theme-toggle" style="background:transparent; border:1px solid rgba(255,255,255,0.15); border-radius:50px; padding: 8px 16px; cursor: pointer; color: var(--text-primary); font-size: 0.85rem; font-family: var(--font-body); font-weight: 600; margin-right: 5px;">🌓 Theme</button>
+        <a href="index.html" style="text-decoration: none; margin-right: 5px;"><button style="padding: 8px 16px; cursor: pointer; background:transparent; border:none; color: var(--text-secondary); font-size: 0.85rem; font-family: var(--font-body); font-weight: 600;">Home</button></a>
+        <a href="signup.html" style="text-decoration: none;"><button class="liquid-glass rounded-full px-6 py-2.5 text-sm text-foreground hover:scale-[1.03]" style="cursor: pointer; border-radius: 50px; font-family: var(--font-body); font-weight: 600;">Sign Up</button></a>
+      </div>
+    </nav>
+
+    <section class="dashboard-box animate-fade-rise" style="max-width: 400px; margin: 60px auto; padding: 40px; text-align: center;">
+      <h2 style="margin-top: 0; font-weight: normal; font-size: 2.5rem; font-family: 'Instrument Serif', serif;">Login</h2>
+    <form id="loginForm" style="display:flex; flex-direction:column; gap:20px; margin-top:20px; align-items: stretch;">
+      <input type="text" id="username" placeholder="Username" required>
+      <input type="password" id="password" placeholder="Password" required>
+      <button type="submit" class="btn-primary" style="padding:14px; font-size:16px; cursor:pointer; width:100%; border-radius:30px;">Log In</button>
       <p id="errorMsg" style="color:#ff4444; font-size:14px; margin:0;"></p>
     </form>
   </section>
@@ -49,5 +64,6 @@
         }
     });
   </script>
+  </div> <!-- End content-wrapper -->
 </body>
 </html>
