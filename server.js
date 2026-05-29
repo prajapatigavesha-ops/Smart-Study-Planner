@@ -12,7 +12,7 @@ const openai = new OpenAI({
 });
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 const SECRET_KEY = 'your_super_secret_key_change_in_production'; // For MVP purposes
 
 app.use(cors());
