@@ -1841,9 +1841,14 @@ html, body {
 /* --- MOBILE RESPONSIVENESS OVERHAUL --- */
 @media (max-width: 1024px) {
   .features {
-    grid-template-columns: repeat(2, 1fr) !important;
+    grid-template-columns: 1fr !important;
+    justify-items: center !important;
     padding: 20px !important;
     gap: 16px !important;
+  }
+  .features .card {
+    width: 90% !important;
+    max-width: 350px !important;
   }
 }
 
