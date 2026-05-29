@@ -172,15 +172,15 @@
   <!-- Floating AI Mascot & Chat Window -->
   <div class="ai-mascot-container">
     <div class="chat-dialog" id="chatDialog">
-      <div style="display:flex; justify-content:space-between; align-items:center; background:#1976d2; color:white; padding:10px 15px; border-radius: 12px 12px 0 0;">
-        <h3 style="margin:0; font-size:16px;">🤖 AI Study Buddy</h3>
-        <button onclick="toggleChat(event)" style="background:transparent; color:white; border:none; cursor:pointer; font-size:16px;">✖</button>
+      <div class="chat-header">
+        <h3>🤖 AI Study Buddy</h3>
+        <button onclick="toggleChat(event)">✖</button>
       </div>
       <div style="padding: 15px;">
         <div id="chatBox" class="chat-box" style="height: 300px;"></div>
-        <div class="chat-input-area" style="display:flex; gap:10px; margin-top:15px; justify-content:center;">
-          <input type="text" id="chatInput" placeholder="Ask for study advice..." style="width: 70%; padding: 10px; border:1px solid #ccc; border-radius: 4px;" onkeypress="handleChatKeyPress(event)">
-          <button onclick="sendChat()" style="width: 25%;">Send</button>
+        <div class="chat-input-area">
+          <input type="text" id="chatInput" placeholder="Ask for study advice..." onkeypress="handleChatKeyPress(event)">
+          <button onclick="sendChat()">Send</button>
         </div>
       </div>
     </div>

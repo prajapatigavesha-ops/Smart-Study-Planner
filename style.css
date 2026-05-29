@@ -362,25 +362,60 @@ html.dark .timer h3 {
 }
 
 /* --- AI CHAT MODULE --- */
+/* --- AI CHAT MODULE --- */
 .chat-dialog {
   display: none;
   position: fixed;
   bottom: 140px;
   right: 40px;
   width: 380px;
-  background: var(--glass-bg);
-  backdrop-filter: blur(25px);
-  -webkit-backdrop-filter: blur(25px);
-  border: 1px solid var(--glass-border);
+  background: rgba(0, 20, 35, 0.55) !important;
+  backdrop-filter: blur(25px) !important;
+  -webkit-backdrop-filter: blur(25px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
   border-radius: 24px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6) !important;
   transform-origin: bottom right;
   animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   overflow: hidden;
   z-index: 999;
 }
-html.dark .chat-dialog {
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+
+.chat-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.02) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+  color: hsl(var(--foreground)) !important;
+  padding: 14px 20px !important;
+}
+
+.chat-header h3 {
+  margin: 0;
+  font-size: 1.15rem !important;
+  font-family: 'Instrument Serif', serif !important;
+  font-weight: normal !important;
+  letter-spacing: 0.02em;
+  color: hsl(var(--foreground)) !important;
+  background: none !important;
+  -webkit-text-fill-color: initial !important;
+}
+
+.chat-header button {
+  background: transparent !important;
+  color: hsl(var(--muted-foreground)) !important;
+  border: none !important;
+  cursor: pointer !important;
+  font-size: 1rem !important;
+  padding: 4px !important;
+  box-shadow: none !important;
+  transition: color 0.2s ease !important;
+}
+
+.chat-header button:hover {
+  color: hsl(var(--foreground)) !important;
+  transform: none !important;
 }
 
 .chat-box {
@@ -394,56 +429,91 @@ html.dark .chat-dialog {
 }
 
 .chat-box::-webkit-scrollbar {
-  width: 6px;
+  width: 4px;
 }
 .chat-box::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.1) !important;
+  border-radius: 4px;
 }
-html.dark .chat-box::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
+.chat-box::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2) !important;
 }
 
 .chat-msg {
-  max-width: 85%;
-  padding: 12px 18px;
-  border-radius: 20px;
-  font-size: 0.95rem;
-  line-height: 1.5;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+  font-family: var(--font-body) !important;
+  max-width: 80%;
+  padding: 12px 16px;
+  border-radius: 16px;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
   animation: slideUp 0.3s ease-out;
-}
-html.dark .chat-msg {
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
 }
 
 .msg-user {
   align-self: flex-end;
-  background: linear-gradient(135deg, var(--primary-color), var(--text-secondary));
-  color: white;
-  border-bottom-right-radius: 6px;
-}
-html.dark .msg-user {
-  color: #000;
+  background: linear-gradient(135deg, #1e3a8a, #0369a1) !important; /* cyber glow accent */
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-bottom-right-radius: 4px !important;
 }
 
 .msg-ai {
   align-self: flex-start;
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
-  color: var(--text-primary);
-  border-bottom-left-radius: 6px;
+  background: rgba(255, 255, 255, 0.03) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  color: hsl(var(--foreground)) !important;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  border-bottom-left-radius: 4px !important;
 }
 
 .chat-input-area {
-  padding: 15px;
-  background: rgba(0, 0, 0, 0.03);
-  border-top: 1px solid var(--glass-border);
+  padding: 16px !important;
+  background: rgba(0, 0, 0, 0.2) !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
   display: flex;
-  gap: 10px;
+  gap: 8px;
+  align-items: center;
 }
-html.dark .chat-input-area {
-  background: rgba(0, 0, 0, 0.3);
+
+.chat-input-area input {
+  flex: 1;
+  padding: 10px 16px !important;
+  background: rgba(255, 255, 255, 0.02) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 50px !important;
+  color: hsl(var(--foreground)) !important;
+  font-family: var(--font-body) !important;
+  font-size: 0.88rem !important;
+  outline: none !important;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease !important;
+}
+
+.chat-input-area input:focus {
+  border-color: rgba(96, 165, 250, 0.5) !important;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1), 0 0 10px rgba(96, 165, 250, 0.2) !important;
+}
+
+.chat-input-area button {
+  background: rgba(255, 255, 255, 0.03) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  color: hsl(var(--foreground)) !important;
+  padding: 10px 20px !important;
+  border-radius: 50px !important;
+  font-size: 0.88rem !important;
+  font-family: var(--font-body) !important;
+  font-weight: 600 !important;
+  cursor: pointer !important;
+  box-shadow: none !important;
+  transition: all 0.3s ease !important;
+}
+
+.chat-input-area button:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+  transform: scale(1.03) !important;
 }
 
 /* Floating AI Mascot */
@@ -462,19 +532,22 @@ html.dark .chat-input-area {
   width: 90px;
   height: 90px;
   border-radius: 50%;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
-  transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.3s ease, border-color 0.3s ease;
   animation: float 4s ease-in-out infinite;
-  background: var(--glass-bg);
+  background: rgba(255, 255, 255, 0.03) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
   object-fit: cover;
-  border: 4px solid var(--text-secondary);
-}
-html.dark .ai-mascot {
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  padding: 6px;
+  box-sizing: border-box;
 }
 
 .ai-mascot:hover {
   transform: scale(1.15) rotate(8deg);
+  box-shadow: 0 0 25px rgba(96, 165, 250, 0.5), 0 0 50px rgba(96, 165, 250, 0.3), 0 10px 30px rgba(0, 0, 0, 0.4) !important;
+  border-color: rgba(96, 165, 250, 0.8) !important;
 }
 
 .speech-bubble {
@@ -493,6 +566,7 @@ html.dark .ai-mascot {
   animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   border: 1px solid var(--glass-border);
 }
+
 html.dark .speech-bubble {
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
 }
