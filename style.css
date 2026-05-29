@@ -1853,6 +1853,17 @@ html, body {
 }
 
 @media (max-width: 768px) {
+  /* Full-width cards overrides for mobile viewports */
+  .features {
+    grid-template-columns: 1fr !important;
+    padding: 20px !important;
+    gap: 16px !important;
+  }
+  .features .card {
+    width: 100% !important;
+    max-width: none !important;
+  }
+
   /* Quote Adjustments */
   .hero-quote-text {
     font-size: 1.75rem !important;
@@ -1874,21 +1885,21 @@ html, body {
     right: 20px !important;
   }
   .ai-mascot {
-    width: 68px !important;
-    height: 68px !important;
-    padding: 4px !important;
+    width: 70px !important;
+    height: 70px !important;
+    padding: 5px !important;
   }
   .chat-dialog {
-    bottom: 100px !important;
+    bottom: 110px !important;
     right: 20px !important;
     width: calc(100% - 40px) !important;
-    max-width: 350px !important;
+    max-width: 480px !important;
     border-radius: 20px !important;
   }
   .speech-bubble {
-    font-size: 0.85rem !important;
-    padding: 10px 14px !important;
-    max-width: 200px !important;
+    font-size: 0.88rem !important;
+    padding: 12px 16px !important;
+    max-width: 260px !important;
     margin-bottom: 12px !important;
   }
 
