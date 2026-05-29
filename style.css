@@ -362,19 +362,18 @@ html.dark .timer h3 {
 }
 
 /* --- AI CHAT MODULE --- */
-/* --- AI CHAT MODULE --- */
 .chat-dialog {
   display: none;
   position: fixed;
   bottom: 140px;
   right: 40px;
   width: 380px;
-  background: rgba(0, 20, 35, 0.55) !important;
+  background: rgba(8, 18, 30, 0.55) !important;
   backdrop-filter: blur(25px) !important;
   -webkit-backdrop-filter: blur(25px) !important;
   border: 1px solid rgba(255, 255, 255, 0.15) !important;
   border-radius: 24px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6) !important;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6), inset 0 1px 2px rgba(255, 255, 255, 0.1) !important;
   transform-origin: bottom right;
   animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   overflow: hidden;
@@ -393,8 +392,9 @@ html.dark .timer h3 {
 
 .chat-header h3 {
   margin: 0;
-  font-size: 1.15rem !important;
-  font-family: 'Instrument Serif', serif !important;
+  font-size: 1.35rem !important;
+  font-family: var(--font-display) !important;
+  font-style: italic;
   font-weight: normal !important;
   letter-spacing: 0.02em;
   color: hsl(var(--foreground)) !important;
@@ -431,12 +431,15 @@ html.dark .timer h3 {
 .chat-box::-webkit-scrollbar {
   width: 4px;
 }
+.chat-box::-webkit-scrollbar-track {
+  background: transparent;
+}
 .chat-box::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1) !important;
-  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-radius: 10px;
 }
 .chat-box::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2) !important;
+  background: rgba(255, 255, 255, 0.18) !important;
 }
 
 .chat-msg {
@@ -444,7 +447,7 @@ html.dark .timer h3 {
   max-width: 80%;
   padding: 12px 16px;
   border-radius: 16px;
-  font-size: 0.9rem;
+  font-size: 0.88rem;
   line-height: 1.45;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
   animation: slideUp 0.3s ease-out;
@@ -452,20 +455,24 @@ html.dark .timer h3 {
 
 .msg-user {
   align-self: flex-end;
-  background: linear-gradient(135deg, #1e3a8a, #0369a1) !important; /* cyber glow accent */
+  background: linear-gradient(135deg, rgba(14, 116, 144, 0.7), rgba(6, 182, 212, 0.7)) !important;
+  border: 1px solid rgba(34, 211, 238, 0.3) !important;
   color: #ffffff !important;
-  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 16px !important;
   border-bottom-right-radius: 4px !important;
+  box-shadow: 0 4px 15px rgba(6, 182, 212, 0.2) !important;
 }
 
 .msg-ai {
   align-self: flex-start;
   background: rgba(255, 255, 255, 0.03) !important;
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
   color: hsl(var(--foreground)) !important;
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  border-radius: 16px !important;
   border-bottom-left-radius: 4px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25) !important;
 }
 
 .chat-input-area {
@@ -479,41 +486,45 @@ html.dark .timer h3 {
 
 .chat-input-area input {
   flex: 1;
-  padding: 10px 16px !important;
-  background: rgba(255, 255, 255, 0.02) !important;
+  padding: 12px 18px !important;
+  background: rgba(255, 255, 255, 0.03) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
   border: 1px solid rgba(255, 255, 255, 0.1) !important;
-  border-radius: 50px !important;
-  color: hsl(var(--foreground)) !important;
+  border-radius: 30px !important;
+  color: #ffffff !important;
   font-family: var(--font-body) !important;
   font-size: 0.88rem !important;
   outline: none !important;
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1) !important;
-  transition: border-color 0.3s ease, box-shadow 0.3s ease !important;
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.25) !important;
+  transition: all 0.3s ease !important;
 }
 
 .chat-input-area input:focus {
-  border-color: rgba(96, 165, 250, 0.5) !important;
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1), 0 0 10px rgba(96, 165, 250, 0.2) !important;
+  border-color: rgba(34, 211, 238, 0.4) !important;
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.25), 0 0 12px rgba(34, 211, 238, 0.2) !important;
+  background: rgba(255, 255, 255, 0.05) !important;
 }
 
 .chat-input-area button {
-  background: rgba(255, 255, 255, 0.03) !important;
-  border: 1px solid rgba(255, 255, 255, 0.1) !important;
-  color: hsl(var(--foreground)) !important;
+  background: linear-gradient(135deg, rgba(14, 116, 144, 0.5), rgba(6, 182, 212, 0.5)) !important;
+  border: 1px solid rgba(34, 211, 238, 0.2) !important;
+  color: #ffffff !important;
   padding: 10px 20px !important;
-  border-radius: 50px !important;
+  border-radius: 30px !important;
   font-size: 0.88rem !important;
   font-family: var(--font-body) !important;
   font-weight: 600 !important;
   cursor: pointer !important;
-  box-shadow: none !important;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1) !important;
   transition: all 0.3s ease !important;
 }
 
 .chat-input-area button:hover {
-  background: rgba(255, 255, 255, 0.08) !important;
-  border-color: rgba(255, 255, 255, 0.2) !important;
-  transform: scale(1.03) !important;
+  background: linear-gradient(135deg, rgba(14, 116, 144, 0.7), rgba(6, 182, 212, 0.7)) !important;
+  border-color: rgba(34, 211, 238, 0.5) !important;
+  transform: translateY(-1px) scale(1.03) !important;
+  box-shadow: 0 0 15px rgba(34, 211, 238, 0.3), 0 4px 10px rgba(0, 0, 0, 0.15) !important;
 }
 
 /* Floating AI Mascot */
@@ -532,43 +543,45 @@ html.dark .timer h3 {
   width: 90px;
   height: 90px;
   border-radius: 50%;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), inset 0 1px 2px rgba(255, 255, 255, 0.15) !important;
   transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.3s ease, border-color 0.3s ease;
   animation: float 4s ease-in-out infinite;
-  background: rgba(255, 255, 255, 0.03) !important;
-  backdrop-filter: blur(8px) !important;
-  -webkit-backdrop-filter: blur(8px) !important;
+  background: rgba(8, 18, 30, 0.4) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
   object-fit: cover;
-  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  border: 1px solid rgba(255, 255, 255, 0.18) !important;
   padding: 6px;
   box-sizing: border-box;
 }
 
 .ai-mascot:hover {
-  transform: scale(1.15) rotate(8deg);
-  box-shadow: 0 0 25px rgba(96, 165, 250, 0.5), 0 0 50px rgba(96, 165, 250, 0.3), 0 10px 30px rgba(0, 0, 0, 0.4) !important;
-  border-color: rgba(96, 165, 250, 0.8) !important;
+  transform: scale(1.1) rotate(8deg);
+  box-shadow: 0 0 25px rgba(34, 211, 238, 0.6), 0 0 50px rgba(6, 182, 212, 0.4), 0 10px 30px rgba(0, 0, 0, 0.5), inset 0 1px 3px rgba(255, 255, 255, 0.35) !important;
+  border-color: rgba(34, 211, 238, 0.8) !important;
 }
 
 .speech-bubble {
   display: none;
-  background: var(--glass-bg);
-  backdrop-filter: blur(10px);
-  color: var(--text-primary);
-  padding: 15px 20px;
-  border-radius: 16px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-  margin-bottom: 20px;
-  position: relative;
-  text-align: center;
-  font-size: 0.95rem;
-  font-weight: 600;
-  animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  border: 1px solid var(--glass-border);
+  background: rgba(8, 18, 30, 0.6) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  color: var(--text-primary) !important;
+  padding: 15px 20px !important;
+  border-radius: 18px !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5) !important;
+  margin-bottom: 20px !important;
+  position: relative !important;
+  text-align: center !important;
+  font-size: 0.92rem !important;
+  font-family: var(--font-body) !important;
+  font-weight: 500 !important;
+  animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
 }
 
 html.dark .speech-bubble {
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6) !important;
 }
 
 .speech-bubble::after {
@@ -579,7 +592,7 @@ html.dark .speech-bubble {
   transform: translateX(-50%);
   border-width: 10px 10px 0;
   border-style: solid;
-  border-color: var(--glass-bg) transparent transparent transparent;
+  border-color: rgba(8, 18, 30, 0.6) transparent transparent transparent;
   display: block;
   width: 0;
 }
