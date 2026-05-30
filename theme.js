@@ -12,7 +12,7 @@ function toggleTheme() {
   }
   
   // Update Chart.js if on dashboard
-  if (typeof Chart !== 'undefined') {
+  if (typeof Chart !== 'undefined' && typeof updateChart === 'function') {
     updateChart();
   }
 }
