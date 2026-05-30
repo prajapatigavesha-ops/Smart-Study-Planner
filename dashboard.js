@@ -28,12 +28,75 @@ document.addEventListener("DOMContentLoaded", () => {
         logoutBtn.onclick = logout;
         navDiv.appendChild(logoutBtn);
     }
+    checkStreak();
     fetchTasks();
     fetchStats();
     if (typeof renderSpacedRepetition === 'function') {
         renderSpacedRepetition();
     }
 });
+
+function getLocalDateString(date) {
+    const offset = date.getTimezoneOffset();
+    const localDate = new Date(date.getTime() - (offset * 60 * 1000));
+    return localDate.toISOString().split('T')[0];
+}
+
+function checkStreak() {
+    const todayStr = getLocalDateString(new Date());
+    
+    // Yesterday
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = getLocalDateString(yesterday);
+    
+    let lastVisit = localStorage.getItem('last_visit_date');
+    let currentStreak = parseInt(localStorage.getItem('current_streak_count'));
+    
+    if (isNaN(currentStreak)) {
+        currentStreak = 0;
+    }
+    
+    if (!lastVisit) {
+        currentStreak = 1;
+        lastVisit = todayStr;
+    } else if (lastVisit === yesterdayStr) {
+        currentStreak += 1;
+        lastVisit = todayStr;
+    } else if (lastVisit === todayStr) {
+        // Maintain existing streak
+    } else {
+        currentStreak = 1;
+        lastVisit = todayStr;
+    }
+    
+    localStorage.setItem('last_visit_date', lastVisit);
+    localStorage.setItem('current_streak_count', currentStreak.toString());
+    return currentStreak;
+}
+
+function editStudyTarget(event) {
+    if (event) event.preventDefault();
+    const val = prompt("Enter your daily study target in minutes (e.g. 60, 90, 120):", localStorage.getItem('study_target_minutes') || "150");
+    if (val !== null) {
+        const mins = parseInt(val);
+        if (!isNaN(mins) && mins > 0) {
+            localStorage.setItem('study_target_minutes', mins.toString());
+            updateGoalProgressRing();
+            generateAIBriefing();
+        } else {
+            alert("Please enter a valid number of minutes.");
+        }
+    }
+}
+window.editStudyTarget = editStudyTarget;
+
+function getAppStatus() {
+    if (timer) {
+        return mode === 'study' ? "Focusing" : "On Break";
+    }
+    return "Planning";
+}
 
 let tasks = [];
 let subjects = {};
@@ -400,7 +463,7 @@ function updateChart() {
 
 /* --- SVG GOAL PROGRESS RING ANIMATOR --- */
 function updateGoalProgressRing() {
-  const targetMinutes = 150;
+  const targetMinutes = parseInt(localStorage.getItem('study_target_minutes')) || 150;
   const studyMins = Math.floor(totalStudyTime / 60);
   const percent = Math.min(100, Math.round((studyMins / targetMinutes) * 100));
   
@@ -470,18 +533,21 @@ function generateAIBriefing() {
   const completedTasks = tasks.filter(t => t.completed).length;
   const studyMins = Math.floor(totalStudyTime / 60);
   
-  let statusStr = "Focusing";
+  const statusStr = getAppStatus();
   let statusColor = "var(--accent-indigo)";
+  if (statusStr === "On Break") {
+      statusColor = "var(--accent-mint)";
+  } else if (statusStr === "Planning") {
+      statusColor = "rgba(255, 255, 255, 0.4)";
+  }
+  
+  const targetMinutes = parseInt(localStorage.getItem('study_target_minutes')) || 150;
   let brief = "";
   
   if (pendingTasks === 0 && completedTasks > 0) {
-      statusStr = "Accomplished";
-      statusColor = "var(--accent-mint)";
       brief = "Outstanding! You have completed all scheduled tasks on your timeline today. Keep this momentum high to secure your next study streak!";
-  } else if (studyMins >= 150) {
-      statusStr = "Goal Reached";
-      statusColor = "var(--accent-mint)";
-      brief = `Excellent work! You reached your daily study target of 150 mins (Total: ${studyMins}m). You still have ${pendingTasks} task(s) on your timeline. Let's finish strong!`;
+  } else if (studyMins >= targetMinutes) {
+      brief = `Excellent work! You reached your daily study target of ${targetMinutes} mins (Total: ${studyMins}m). You still have ${pendingTasks} task(s) on your timeline. Let's finish strong!`;
   } else if (completedTasks > 0) {
       brief = `Great progress. You completed ${completedTasks} timeline task(s) and logged ${studyMins} minutes of focus. Peak productivity is forecast for your afternoon blocks.`;
   } else if (pendingTasks > 0) {
@@ -496,11 +562,16 @@ function generateAIBriefing() {
       briefingStatus.style.color = statusColor;
   }
   if (briefingTarget) {
-      briefingTarget.innerText = "150m";
+      const storedTarget = localStorage.getItem('study_target_minutes');
+      if (storedTarget) {
+          briefingTarget.innerHTML = `<span onclick="editStudyTarget(event)" style="cursor: pointer; text-decoration: underline;">${storedTarget}m</span>`;
+      } else {
+          briefingTarget.innerHTML = `<a href="#" onclick="editStudyTarget(event)" style="text-decoration: underline; color: var(--accent-indigo); font-weight: 800;">[Set Goal]</a>`;
+      }
   }
   if (briefingStreak) {
-      const streakDays = sessionsCompleted > 0 ? 5 : 4;
-      briefingStreak.innerText = `${streakDays} Days`;
+      const streakVal = localStorage.getItem('current_streak_count') || "0";
+      briefingStreak.innerText = `${streakVal} Days`;
   }
 }
 
