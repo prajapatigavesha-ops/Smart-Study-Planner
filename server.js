@@ -41,6 +41,13 @@ const db = new sqlite3.Database('./database.sqlite', (err) => {
                 completed BOOLEAN
             )`);
             
+            // Add column 'tag' to tasks table if it does not exist
+            db.run(`ALTER TABLE tasks ADD COLUMN tag TEXT`, (err) => {
+                if (err) {
+                    // Ignore error if column already exists
+                }
+            });
+            
             db.run(`CREATE TABLE IF NOT EXISTS stats (
                 userId INTEGER PRIMARY KEY,
                 totalStudyTime INTEGER DEFAULT 0,
@@ -117,18 +124,19 @@ app.post('/auth/login', (req, res) => {
 app.get('/api/tasks', authenticateToken, (req, res) => {
     db.all(`SELECT * FROM tasks WHERE userId = ?`, [req.user.id], (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });
-        res.json(rows.map(r => ({ id: r.id, text: r.text, completed: Boolean(r.completed) })));
+        res.json(rows.map(r => ({ id: r.id, text: r.text, completed: Boolean(r.completed), tag: r.tag || '' })));
     });
 });
 
 // Add a task
 app.post('/api/tasks', authenticateToken, (req, res) => {
-    const { text, completed } = req.body;
+    const { text, completed, tag } = req.body;
     const isCompleted = completed ? 1 : 0;
+    const taskTag = tag || '';
     
-    db.run(`INSERT INTO tasks (userId, text, completed) VALUES (?, ?, ?)`, [req.user.id, text, isCompleted], function(err) {
+    db.run(`INSERT INTO tasks (userId, text, completed, tag) VALUES (?, ?, ?, ?)`, [req.user.id, text, isCompleted, taskTag], function(err) {
         if (err) return res.status(500).json({ error: err.message });
-        res.status(201).json({ id: this.lastID, text, completed: Boolean(isCompleted) });
+        res.status(201).json({ id: this.lastID, text, completed: Boolean(isCompleted), tag: taskTag });
     });
 });
 
@@ -182,7 +190,21 @@ app.put('/api/stats', authenticateToken, (req, res) => {
 });
 
 // --- AI Chat Endpoint ---
-app.post('/api/chat', authenticateToken, async (req, res) => {
+app.post('/api/chat', (req, res, next) => {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    
+    if (token) {
+        jwt.verify(token, SECRET_KEY, (err, user) => {
+            if (err) return res.sendStatus(403);
+            req.user = user;
+            next();
+        });
+    } else {
+        req.user = null;
+        next();
+    }
+}, async (req, res) => {
     const { message } = req.body;
     
     if (process.env.OPENAI_API_KEY && (process.env.OPENAI_API_KEY.startsWith('sk-') || process.env.OPENAI_API_KEY.startsWith('proj-'))) {

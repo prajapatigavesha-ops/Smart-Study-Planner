@@ -46,12 +46,13 @@ function generateSpacedRepetitionSchedule(topicId, personalizedTitle, baseDate =
 /**
  * Appends a new customized study topic to the active state array.
  */
-function addNewTopic(subject, topic, grade) {
+function addNewTopic(subject, topic, grade, tag) {
     const newTopic = {
         id: 'topic-' + Math.random().toString(36).substring(2, 9) + '-' + Date.now().toString(36),
         subject: subject,
         topic: topic,
         grade: grade,
+        tag: tag || subject,
         mastered: false
     };
     studyTopics.push(newTopic);

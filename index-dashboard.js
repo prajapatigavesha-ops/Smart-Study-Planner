@@ -47,10 +47,21 @@ let currentView = 'home';
 
 document.addEventListener("DOMContentLoaded", async () => {
     setupAuthNavbar();
+    initializeStreakGrid();
+    initializeChatTokens();
     await loadTimerStats();
     generateStreakTracker();
     renderSpacedRepetition();
     setupTextareaListener();
+    
+    // Auto show speech bubble after 2 seconds for guest
+    setTimeout(() => {
+        const bubble = document.getElementById('speechBubble');
+        const dialog = document.getElementById('chatDialog');
+        if (bubble && dialog && dialog.style.display !== 'block' && !isAuthenticated) {
+            bubble.style.display = 'block';
+        }
+    }, 2000);
     
     // Default to home view
     switchView('home');
@@ -89,7 +100,10 @@ function setupAuthNavbar() {
             `;
         }
     } else {
-        if (localBanner) localBanner.style.display = 'flex';
+        if (localBanner) {
+            localBanner.style.display = 'flex';
+            localBanner.innerHTML = `<span>☁️ Playing in Local Mode. Don't lose your streak—<a href="signup.html">Create an account</a> to save your grid permanently!</span>`;
+        }
     }
 }
 
@@ -187,6 +201,18 @@ function startTimer() {
             if (timerMode === 'study') {
                 sessionsCompleted++;
                 saveTimerStats();
+                
+                // Update local streak grid immediately
+                if (!isAuthenticated) {
+                    const todayStr = getLocalDateString(new Date());
+                    let grid = JSON.parse(localStorage.getItem('streakGrid')) || {};
+                    grid[todayStr] = sessionsCompleted;
+                    localStorage.setItem('streakGrid', JSON.stringify(grid));
+                }
+                
+                // Trigger confetti celebration
+                triggerCelebration();
+                
                 alert("Study session complete! Take a 5-minute break.");
                 timerMode = 'break';
                 timeLeft = 300; // 5 mins
@@ -196,7 +222,7 @@ function startTimer() {
                 timeLeft = 1500; // 25 mins
             }
             updateTimerStatsDisplay();
-            generateStreakTracker();
+            generateStreakTracker(true); // highlight today's cell
             updateTimerDisplay();
             return;
         }
@@ -243,33 +269,68 @@ function updateTimerDisplay() {
     }
 }
 
+// --- Date helper for local grid ---
+function getLocalDateString(date) {
+    const offset = date.getTimezoneOffset();
+    const localDate = new Date(date.getTime() - (offset * 60 * 1000));
+    return localDate.toISOString().split('T')[0];
+}
+
+// --- Initialize streak grid with seed values ---
+function initializeStreakGrid() {
+    let grid = localStorage.getItem('streakGrid');
+    if (!grid) {
+        const streakGrid = {};
+        const today = new Date();
+        const seedValues = [
+            0, 1, 2, 0, 3, 2, 1,
+            0, 0, 1, 2, 3, 0, 1,
+            2, 1, 0, 2, 3, 2, 1,
+            0, 1, 1, 2, 0, 3, 2,
+            1, 2, 0, 3, 3, 2
+        ];
+        for (let i = 0; i < 34; i++) {
+            const d = new Date();
+            d.setDate(today.getDate() - (34 - i));
+            streakGrid[getLocalDateString(d)] = seedValues[i];
+        }
+        streakGrid[getLocalDateString(today)] = 0;
+        localStorage.setItem('streakGrid', JSON.stringify(streakGrid));
+    }
+}
+
 // --- Study Streak Tracker Heatmap ---
-function generateStreakTracker() {
+function generateStreakTracker(highlightToday = false) {
     const matrix = document.getElementById("heatmapMatrix");
     if (!matrix) return;
     matrix.innerHTML = "";
     
-    // Seed with 34 days of past study levels
-    const pastLevels = [
-        0, 1, 2, 0, 3, 2, 1,
-        0, 0, 1, 2, 3, 0, 1,
-        2, 1, 0, 2, 3, 2, 1,
-        0, 1, 1, 2, 0, 3, 2,
-        1, 2, 0, 3, 3, 2
-    ];
+    initializeStreakGrid();
+    const grid = JSON.parse(localStorage.getItem('streakGrid')) || {};
+    const today = new Date();
     
-    let todayLevel = 0;
-    if (sessionsCompleted >= 3) todayLevel = 3;
-    else if (sessionsCompleted === 2) todayLevel = 2;
-    else if (sessionsCompleted === 1) todayLevel = 1;
+    // Sync today's sessionsCompleted with the grid
+    const todayStr = getLocalDateString(today);
+    grid[todayStr] = sessionsCompleted;
+    localStorage.setItem('streakGrid', JSON.stringify(grid));
     
-    const levels = [...pastLevels, todayLevel];
+    const levels = [];
+    const dates = [];
+    
+    for (let i = 0; i < 35; i++) {
+        const d = new Date();
+        d.setDate(today.getDate() - (34 - i));
+        const dStr = getLocalDateString(d);
+        const count = grid[dStr] || 0;
+        levels.push(Math.min(3, count));
+        dates.push({ dateStr: dStr, isToday: i === 34, index: i });
+    }
     
     levels.forEach((level, idx) => {
         const cell = document.createElement("div");
-        const isToday = idx === levels.length - 1;
+        const dateInfo = dates[idx];
         
-        cell.className = `heatmap-cell streak-level-${level} ${isToday ? 'today-cell' : ''}`;
+        cell.className = `heatmap-cell streak-level-${level} ${dateInfo.isToday ? 'today-cell' : ''}`;
         cell.style.width = "12px";
         cell.style.height = "12px";
         cell.style.borderRadius = "2px";
@@ -281,7 +342,11 @@ function generateStreakTracker() {
         else if (level === 3) bg = "rgba(99, 102, 241, 1)";
         cell.style.background = bg;
         
-        const dayLabel = isToday ? "Today" : `Day -${levels.length - 1 - idx}`;
+        if (dateInfo.isToday && highlightToday) {
+            cell.classList.add('pulse-highlight');
+        }
+        
+        const dayLabel = dateInfo.isToday ? "Today" : `Day -${levels.length - 1 - idx}`;
         const mins = level === 3 ? "75+ mins" : level === 2 ? "50 mins" : level === 1 ? "25 mins" : "0 mins";
         cell.setAttribute("title", `${dayLabel}: Study level ${level} (${mins})`);
         
@@ -289,17 +354,72 @@ function generateStreakTracker() {
     });
 }
 
+// --- Dynamic Tag Filters ---
+let activeFilter = 'All';
+
+function renderTagFilters() {
+    const container = document.getElementById("tagFilterContainer");
+    if (!container) return;
+    
+    // Gather all unique tags from window.studyTopics
+    const tags = new Set();
+    window.studyTopics.forEach(t => {
+        if (t.tag) tags.add(t.tag);
+    });
+    
+    const tagsArray = ['All', ...Array.from(tags)];
+    
+    // If no topics/tags exist, empty the filter container
+    if (tagsArray.length <= 1) {
+        container.innerHTML = "";
+        return;
+    }
+    
+    container.innerHTML = "";
+    const bar = document.createElement("div");
+    bar.className = "tag-filter-bar animate-fade-in-up stagger-1";
+    
+    const label = document.createElement("span");
+    label.innerText = "🔍 Filter Dashboard:";
+    label.style.cssText = "font-weight: 700; font-size: 0.88rem; color: var(--text-secondary); margin-right: 10px;";
+    bar.appendChild(label);
+    
+    tagsArray.forEach(tag => {
+        const pill = document.createElement("button");
+        pill.className = `filter-pill ${tag === activeFilter ? 'active' : ''}`;
+        pill.innerText = tag;
+        pill.onclick = () => {
+            activeFilter = tag;
+            renderTagFilters();
+            renderSpacedRepetition();
+        };
+        bar.appendChild(pill);
+    });
+    
+    container.appendChild(bar);
+}
+
 // --- Spaced Repetition Simulator Rendering ---
 function renderSpacedRepetition() {
-    // 1. Render Topics List
+    // Render tag filters synchronously to keep filters in sync with added topics
+    renderTagFilters();
+
     const topicsList = document.getElementById("srTopicsList");
+    const reviewsList = document.getElementById("srReviewsList");
+    
+    // Filtered topics
+    const filteredTopics = activeFilter === 'All'
+        ? window.studyTopics
+        : window.studyTopics.filter(t => t.tag === activeFilter);
+        
+    // 1. Render Topics List
     if (topicsList) {
         topicsList.innerHTML = "";
         
-        if (window.studyTopics.length === 0) {
-            topicsList.innerHTML = `<div style="color:var(--text-secondary); text-align:center; padding: 20px; font-style:italic; font-size:0.85rem;">No topics scheduled yet. Add one above!</div>`;
+        if (filteredTopics.length === 0) {
+            topicsList.innerHTML = `<div style="color:var(--text-secondary); text-align:center; padding: 20px; font-style:italic; font-size:0.85rem;">No topics scheduled under '${activeFilter}'. Add one above!</div>`;
         } else {
-            window.studyTopics.forEach(topic => {
+            filteredTopics.forEach(topic => {
                 const card = document.createElement("div");
                 card.className = `topic-mastery-row ${topic.mastered ? 'mastered' : ''}`;
                 card.style.display = "flex";
@@ -312,9 +432,12 @@ function renderSpacedRepetition() {
                 
                 card.innerHTML = `
                     <div style="display:flex; flex-direction:column; gap:2px; text-align:left;">
-                        <span class="step-badge" style="background:rgba(99,102,241,0.1); color:var(--accent-indigo); font-size:0.6rem; padding: 1px 6px; border-radius:4px; font-weight:800; width:fit-content;">
-                            ${topic.grade}
-                        </span>
+                        <div style="display:flex; align-items:center; gap:6px;">
+                            <span class="step-badge" style="background:rgba(99,102,241,0.1); color:var(--accent-indigo); font-size:0.6rem; padding: 1px 6px; border-radius:4px; font-weight:800; width:fit-content;">
+                                ${topic.grade}
+                            </span>
+                            ${topic.tag ? `<span class="tag-badge">${topic.tag}</span>` : ''}
+                        </div>
                         <strong class="topic-name-label" style="font-size:0.95rem; margin-top:2px;">${topic.subject}</strong>
                         <span style="font-size:0.8rem; color:var(--text-secondary);">${topic.topic}</span>
                     </div>
@@ -331,14 +454,19 @@ function renderSpacedRepetition() {
     }
     
     // 2. Render Spaced Timeline
-    const reviewsList = document.getElementById("srReviewsList");
     if (reviewsList) {
         reviewsList.innerHTML = "";
         
-        if (window.calendarStore.length === 0) {
-            reviewsList.innerHTML = `<div style="color:var(--text-secondary); text-align:center; padding: 30px 20px; font-style:italic; font-size:0.9rem; border:1px dashed var(--glass-border); border-radius:16px;">No upcoming reviews. Click Master next to a topic to generate a spaced review schedule!</div>`;
+        const filteredEvents = window.calendarStore.filter(evt => {
+            if (activeFilter === 'All') return true;
+            const associatedTopic = window.studyTopics.find(t => t.id === evt.topicId);
+            return associatedTopic && associatedTopic.tag === activeFilter;
+        });
+        
+        if (filteredEvents.length === 0) {
+            reviewsList.innerHTML = `<div style="color:var(--text-secondary); text-align:center; padding: 30px 20px; font-style:italic; font-size:0.9rem; border:1px dashed var(--glass-border); border-radius:16px;">No upcoming reviews for '${activeFilter}'. Click Master next to a topic to generate a spaced review schedule!</div>`;
         } else {
-            const sortedEvents = [...window.calendarStore].sort((a, b) => {
+            const sortedEvents = [...filteredEvents].sort((a, b) => {
                 return new Date(a.startDateTime) - new Date(b.startDateTime);
             });
             
@@ -350,9 +478,9 @@ function renderSpacedRepetition() {
                     year: 'numeric' 
                 }) + ` at 9:00 AM`;
                 
-                // Get topic attributes
                 const associatedTopic = window.studyTopics.find(t => t.id === evt.topicId);
                 const gradeText = associatedTopic ? associatedTopic.grade : "General";
+                const tagText = associatedTopic && associatedTopic.tag ? associatedTopic.tag : "";
                 
                 const card = document.createElement("div");
                 card.className = "review-schedule-card animate-fade-in-up stagger-1";
@@ -374,6 +502,7 @@ function renderSpacedRepetition() {
                             <span class="step-badge step-badge-${evt.intervalStep}" style="font-size:0.65rem; padding: 2px 6px; border-radius:4px; font-weight:800;">
                                 Step ${evt.intervalStep}
                             </span>
+                            ${tagText ? `<span class="tag-badge">${tagText}</span>` : ''}
                         </div>
                         <span class="review-card-title" style="font-size:0.95rem; font-weight:700; color:var(--text-primary); margin-top:2px;">${evt.title}</span>
                         <span class="review-card-date" style="font-size:0.8rem; color:var(--text-secondary);">📅 ${formattedDate}</span>
@@ -390,8 +519,6 @@ function renderSpacedRepetition() {
         }
     }
 }
-
-// Hook renderSpacedRepetition to global so spaced-repetition.js calls it on update
 window.renderSpacedRepetition = renderSpacedRepetition;
 
 // --- Form submission handler ---
@@ -400,24 +527,26 @@ function handleSRAddTopic(e) {
     const subjectInput = document.getElementById("srSubject");
     const topicInput = document.getElementById("srTopic");
     const gradeInput = document.getElementById("srGrade");
+    const tagInput = document.getElementById("srTag");
     
     if (!subjectInput || !topicInput || !gradeInput) return;
     
     const subject = subjectInput.value.trim();
     const topic = topicInput.value.trim();
     const grade = gradeInput.value.trim();
+    const tag = tagInput ? tagInput.value.trim() : "";
     
     if (!subject || !topic || !grade) return;
     
-    window.addNewTopic(subject, topic, grade);
+    window.addNewTopic(subject, topic, grade, tag);
     
     // Reset form fields
     subjectInput.value = "";
     topicInput.value = "";
     gradeInput.value = "";
+    if (tagInput) tagInput.value = "";
 }
 window.handleSRAddTopic = handleSRAddTopic;
-
 
 // --- Fullscreen Feynman Technique Focus Modal Logic ---
 function openFeynmanModal(topicId) {
@@ -433,6 +562,7 @@ function openFeynmanModal(topicId) {
                     ${activeFeynmanTopic.grade}
                 </span>
                 <h2 style="margin: 0; font-size: 1.25rem; font-weight: 800;">${activeFeynmanTopic.subject}</h2>
+                ${activeFeynmanTopic.tag ? `<span class="tag-badge">${activeFeynmanTopic.tag}</span>` : ''}
             </div>
             <p style="margin: 4px 0 0 0; color: var(--text-secondary); font-size: 0.9rem; font-weight: 600;">Chapter: ${activeFeynmanTopic.topic}</p>
         `;
@@ -459,7 +589,6 @@ function closeFeynmanModal() {
     if (modal) modal.style.display = "none";
     activeFeynmanTopic = null;
 }
-
 window.openFeynmanModal = openFeynmanModal;
 window.closeFeynmanModal = closeFeynmanModal;
 
@@ -558,3 +687,132 @@ function finalizeMastery() {
     alert("Mastery finalized! Spaced review schedules updated.");
 }
 window.finalizeMastery = finalizeMastery;
+
+// --- Gated AI Chatbot Experience ---
+let chatTokens = 3;
+
+function initializeChatTokens() {
+    if (localStorage.getItem('chatTokens') === null) {
+        localStorage.setItem('chatTokens', '3');
+    }
+    chatTokens = parseInt(localStorage.getItem('chatTokens'));
+    updateTokenDisplay();
+}
+
+function updateTokenDisplay() {
+    const counter = document.getElementById("tokenCounter");
+    const overlay = document.getElementById("chatLockoutOverlay");
+    
+    if (isAuthenticated) {
+        if (counter) counter.innerText = "Unlimited";
+        if (overlay) overlay.style.display = "none";
+    } else {
+        if (counter) counter.innerText = `${chatTokens} left`;
+        if (chatTokens <= 0) {
+            if (overlay) overlay.style.display = "flex";
+        } else {
+            if (overlay) overlay.style.display = "none";
+        }
+    }
+}
+
+function toggleChat(e) {
+    if (e) e.stopPropagation();
+    const dialog = document.getElementById('chatDialog');
+    if (dialog) {
+        const isOpen = dialog.style.display === 'block';
+        dialog.style.display = isOpen ? 'none' : 'block';
+        if (!isOpen) {
+            initializeChatTokens();
+            const bubble = document.getElementById('speechBubble');
+            if (bubble) bubble.style.display = 'none';
+        }
+    }
+}
+window.toggleChat = toggleChat;
+
+function handleChatKeyPress(e) {
+    if (e.key === 'Enter') {
+        sendChat();
+    }
+}
+window.handleChatKeyPress = handleChatKeyPress;
+
+async function sendChat() {
+    const input = document.getElementById('chatInput');
+    const msg = input.value.trim();
+    if (!msg) return;
+    
+    if (!isAuthenticated) {
+        if (chatTokens <= 0) {
+            updateTokenDisplay();
+            return;
+        }
+        chatTokens--;
+        localStorage.setItem('chatTokens', chatTokens.toString());
+        updateTokenDisplay();
+    }
+    
+    appendChatMessage(msg, 'user');
+    input.value = '';
+    
+    try {
+        const headers = isAuthenticated ? getAuthHeaders() : { 'Content-Type': 'application/json' };
+        const res = await fetch('/api/chat', {
+            method: 'POST',
+            headers: headers,
+            body: JSON.stringify({ message: msg })
+        });
+        
+        if (res.ok) {
+            const data = await res.json();
+            appendChatMessage(data.reply, 'ai');
+        } else {
+            try {
+                const data = await res.json();
+                appendChatMessage(`Error: ${data.details || data.error || 'Failed to communicate with AI.'}`, 'ai');
+            } catch(e) {
+                appendChatMessage('Error communicating with AI.', 'ai');
+            }
+        }
+    } catch (err) {
+        appendChatMessage('Connection error.', 'ai');
+    }
+}
+window.sendChat = sendChat;
+
+function appendChatMessage(text, sender) {
+    const chatBox = document.getElementById('chatBox');
+    if (!chatBox) return;
+    const msgDiv = document.createElement('div');
+    msgDiv.className = `chat-msg msg-${sender}`;
+    msgDiv.innerText = text;
+    chatBox.appendChild(msgDiv);
+    chatBox.scrollTop = chatBox.scrollHeight;
+}
+
+// --- Confetti particle generator ---
+function triggerCelebration() {
+    const container = document.body;
+    const colors = ['#818cf8', '#34d399', '#f472b6', '#fbbf24', '#38bdf8'];
+    for (let i = 0; i < 60; i++) {
+        const p = document.createElement('div');
+        p.className = 'confetti-particle';
+        p.style.left = '50%';
+        p.style.top = '50%';
+        p.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+        
+        const angle = Math.random() * Math.PI * 2;
+        const velocity = 5 + Math.random() * 12;
+        const vx = Math.cos(angle) * velocity;
+        const vy = Math.sin(angle) * velocity - 3;
+        
+        p.style.setProperty('--vx', `${vx * 15}px`);
+        p.style.setProperty('--vy', `${vy * 15}px`);
+        p.style.setProperty('--rotation', `${Math.random() * 360}deg`);
+        
+        container.appendChild(p);
+        
+        setTimeout(() => p.remove(), 2000);
+    }
+}

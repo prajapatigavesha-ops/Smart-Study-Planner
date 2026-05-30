@@ -55,8 +55,12 @@
       <div class="dashboard-box animate-fade-in-up stagger-2" style="display:flex; flex-direction:column;">
         <h2 style="margin-top: 0; font-size: 1.5rem; font-weight: 800; border-bottom: 1px solid var(--glass-border); padding-bottom: 12px; margin-bottom: 20px;">📅 Interactive Timeline</h2>
         
-        <div style="display:flex; gap:10px; margin-bottom: 20px; align-items:center;">
-          <input type="text" id="taskInput" placeholder="Add study topic (e.g., Coding React Components)" style="flex:1;">
+        <!-- Dynamic Tag Filter Bar -->
+        <div id="tagFilterContainer"></div>
+        
+        <div style="display:flex; gap:10px; margin-bottom: 20px; align-items:center; flex-wrap: wrap;">
+          <input type="text" id="taskInput" placeholder="Add study topic (e.g., Coding React Components)" style="flex:2; min-width: 200px;">
+          <input type="text" id="taskTagInput" placeholder="Tag (e.g. Math)" style="flex:1; min-width: 100px; padding: 10px 16px !important; font-size: 0.9rem !important;">
           <button onclick="addTask()" class="btn-primary" style="border-radius:30px; padding: 12px 24px;">Schedule</button>
         </div>
         
@@ -100,6 +104,7 @@
                 </div>
                 <div style="display:flex; gap:10px; flex-wrap: wrap; align-items: center;">
                   <input type="text" id="srGrade" placeholder="Class/Grade (e.g. Class 10, Grade 12)" required style="flex:1; min-width: 140px; padding: 10px 16px !important; font-size: 0.9rem !important;">
+                  <input type="text" id="srTag" placeholder="Tag/Folder (e.g. Unit 1)" style="flex:1; min-width: 140px; padding: 10px 16px !important; font-size: 0.9rem !important;">
                   <button type="submit" class="btn-primary" style="padding: 10px 20px; font-size: 0.9rem; border-radius: 30px; cursor: pointer;">+ Add New Topic</button>
                 </div>
               </form>

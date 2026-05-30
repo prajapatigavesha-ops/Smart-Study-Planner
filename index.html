@@ -71,13 +71,6 @@
       <footer style="margin-top: 40px; padding: 20px 0; border-top: 1px solid rgba(255, 255, 255, 0.05); text-align: center; opacity: 0.5;">
       </footer>
 
-    <!-- Floating AI Mascot -->
-    <div class="ai-mascot-container" onclick="toggleSpeechBubble()">
-      <div class="speech-bubble" id="speechBubble">
-        Hi! I'm your AI Study Buddy.<br><a href="login.html" style="color:#1976d2; font-weight:bold; text-decoration:none;">Log in</a> to chat!
-      </div>
-      <img src="robot_mascot.png" alt="AI Mascot" class="ai-mascot">
-    </div>
   </div>
 
   <!-- ==================== VIEW 2: DASHBOARD VIEW (3-COLUMN DASHBOARD) ==================== -->
@@ -85,9 +78,11 @@
     
     <!-- Local saving notification banner -->
     <div class="local-banner" id="localBanner" style="display: none;">
-      <span>☁️ Running in Local Mode.</span>
-      <a href="login.html">Log In</a> or <a href="signup.html">Sign Up</a> to synchronize your study progress across devices!
+      <span>☁️ Playing in Local Mode. Don't lose your streak—<a href="signup.html">Create an account</a> to save your grid permanently!</span>
     </div>
+
+    <!-- Dynamic Tag Filter Bar -->
+    <div id="tagFilterContainer" style="max-width: 1200px; margin: 0 auto 10px auto;"></div>
 
     <!-- 3-Column Layout Container -->
     <div class="home-dashboard-container">
@@ -104,6 +99,7 @@
           <input type="text" id="srSubject" placeholder="Subject Name (e.g. Maths, Biology)" required style="width:100%; box-sizing:border-box;">
           <input type="text" id="srTopic" placeholder="Specific Topic (e.g. Quadratic Equations)" required style="width:100%; box-sizing:border-box;">
           <input type="text" id="srGrade" placeholder="Class / Grade Level (e.g. Class 10)" required style="width:100%; box-sizing:border-box;">
+          <input type="text" id="srTag" placeholder="Tag / Folder (e.g. Unit 1)" style="width:100%; box-sizing:border-box;">
           <button type="submit" class="btn-primary" style="padding: 12px; font-size: 0.95rem; border-radius: 30px; cursor: pointer; width:100%;">+ Add New Topic</button>
         </form>
 
@@ -268,23 +264,40 @@
     </div>
   </div>
 
-  <script>
-    function toggleSpeechBubble() {
-      const bubble = document.getElementById('speechBubble');
-      if (bubble) {
-        bubble.style.display = bubble.style.display === 'block' ? 'none' : 'block';
-      }
-    }
-    // Auto show speech bubble after 2 seconds
-    setTimeout(() => {
-        const bubble = document.getElementById('speechBubble');
-        if (bubble && bubble.style.display !== 'block') {
-            bubble.style.display = 'block';
-        }
-    }, 2000);
-  </script>
-
   </div> <!-- End content-wrapper -->
+
+  <!-- Floating AI Mascot & Chat Window -->
+  <div class="ai-mascot-container">
+    <div class="chat-dialog" id="chatDialog" style="display: none;">
+      <div class="chat-header">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <h3>🤖 AI Study Buddy</h3>
+          <span id="tokenCounter" style="font-size: 0.72rem; background: rgba(99,102,241,0.2); color: var(--accent-indigo); padding: 2px 8px; border-radius: 12px; font-weight: 800;">3 left</span>
+        </div>
+        <button onclick="toggleChat(event)">✖</button>
+      </div>
+      <div style="padding: 15px; position: relative;">
+        <!-- Lockout Overlay -->
+        <div id="chatLockoutOverlay" class="lockout-overlay" style="display: none;">
+          <span style="font-size: 2rem;">🔒</span>
+          <h3>Tokens Used!</h3>
+          <p>You've used your free local tokens! Sync your progress and chat endlessly by creating a free account.</p>
+          <button onclick="window.location.href='signup.html'" class="btn-primary" style="padding: 10px 20px; border-radius: 30px; cursor: pointer; font-weight: bold; width: 100%;">Sign Up / Sync</button>
+        </div>
+        
+        <div id="chatBox" class="chat-box" style="height: 300px;"></div>
+        <div class="chat-input-area" id="chatInputArea">
+          <input type="text" id="chatInput" placeholder="Ask for study advice..." onkeypress="handleChatKeyPress(event)">
+          <button onclick="sendChat()">Send</button>
+        </div>
+      </div>
+    </div>
+    
+    <div class="speech-bubble" id="speechBubble" style="display: none;">
+      Hi! I'm your AI Study Buddy. Ask me anything!
+    </div>
+    <img src="robot_mascot.png" alt="AI Mascot" class="ai-mascot" onclick="toggleChat(event)">
+  </div>
 
   <script src="spaced-repetition.js"></script>
   <script src="index-dashboard.js"></script>

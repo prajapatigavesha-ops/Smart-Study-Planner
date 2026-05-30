@@ -1936,3 +1936,190 @@ html, body {
     font-size: 1.45rem !important;
   }
 }
+
+/* --- ANTI-GRAVITY ENHANCEMENTS STYLE SYSTEM --- */
+
+/* Local saving notification banner */
+.local-banner {
+  background: rgba(251, 191, 36, 0.1) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(251, 191, 36, 0.2) !important;
+  border-radius: 16px;
+  padding: 14px 24px;
+  margin: 15px auto 25px auto;
+  max-width: 1200px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: #fbbf24 !important;
+  font-family: var(--font-body);
+  font-size: 0.92rem;
+  font-weight: 500;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  animation: fadeIn 0.5s ease-out;
+  box-sizing: border-box;
+}
+
+.local-banner span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.local-banner a {
+  color: #fbbf24 !important;
+  text-decoration: underline;
+  font-weight: 700;
+  transition: color 0.2s ease;
+}
+
+.local-banner a:hover {
+  color: #ffffff !important;
+}
+
+/* Tag & Folder Badges */
+.tag-badge {
+  background: rgba(99, 102, 241, 0.12) !important;
+  color: var(--accent-indigo) !important;
+  border: 1px solid rgba(99, 102, 241, 0.2) !important;
+  font-size: 0.72rem !important;
+  padding: 3px 8px !important;
+  border-radius: 8px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase;
+  display: inline-block;
+  margin-left: 8px;
+  letter-spacing: 0.03em;
+  vertical-align: middle;
+}
+
+html.dark .tag-badge {
+  background: rgba(129, 140, 248, 0.15) !important;
+  color: #a5b4fc !important;
+  border: 1px solid rgba(129, 140, 248, 0.3) !important;
+}
+
+/* Tag filter bar */
+.tag-filter-bar {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 25px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--glass-border);
+  padding-bottom: 15px;
+  align-items: center;
+  width: 100%;
+}
+
+.filter-pill {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  color: var(--text-secondary);
+  padding: 8px 18px;
+  border-radius: 20px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+}
+
+.filter-pill:hover {
+  background: rgba(99, 102, 241, 0.08);
+  color: var(--text-primary);
+  border-color: var(--accent-indigo);
+  transform: translateY(-1px);
+}
+
+.filter-pill.active {
+  background: var(--accent-indigo) !important;
+  color: #ffffff !important;
+  border-color: var(--accent-indigo) !important;
+  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35);
+}
+
+/* Confetti particles */
+.confetti-particle {
+  position: fixed;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 99999;
+  animation: confettiFall 2s cubic-bezier(0.1, 0.8, 0.3, 1) forwards;
+}
+
+@keyframes confettiFall {
+  0% {
+    transform: translate3d(0, 0, 0) rotate(0deg) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(var(--vx), calc(var(--vy) + 400px), 0) rotate(var(--rotation)) scale(0.5);
+    opacity: 0;
+  }
+}
+
+/* Heatmap cell pulse highlight */
+.pulse-highlight {
+  animation: cellPulse 1.5s ease-out 3 !important;
+}
+
+@keyframes cellPulse {
+  0% {
+    transform: scale(1);
+    filter: brightness(1);
+    box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.8);
+  }
+  50% {
+    transform: scale(1.4);
+    filter: brightness(1.5);
+    box-shadow: 0 0 12px 6px rgba(99, 102, 241, 0.4);
+  }
+  100% {
+    transform: scale(1);
+    filter: brightness(1);
+    box-shadow: 0 0 0 0 rgba(99, 102, 241, 0);
+  }
+}
+
+/* Chat Lockout Overlay style */
+.lockout-overlay {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 30px 24px;
+  gap: 16px;
+  height: 100%;
+  width: 100%;
+  box-sizing: border-box;
+  background: rgba(8, 18, 30, 0.96) !important;
+  backdrop-filter: blur(16px);
+  color: #ffffff;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 100;
+  animation: fadeIn 0.4s ease-out;
+}
+
+.lockout-overlay h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.4rem;
+  font-style: italic;
+  font-weight: 500;
+  color: var(--accent-indigo);
+}
+
+.lockout-overlay p {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  max-width: 280px;
+}

@@ -73,6 +73,9 @@ const timelineSlots = ["08:00", "10:00", "12:00", "14:00", "16:00", "18:00", "20
 const taskSlotsMap = JSON.parse(localStorage.getItem('taskSlots') || '{}');
 
 function renderTasks() {
+  // Render filters dynamically to stay in sync with tasks and topics
+  renderTagFilters();
+
   const timelineList = document.getElementById("timelineList");
   if (!timelineList) return;
   timelineList.innerHTML = "";
@@ -85,13 +88,18 @@ function renderTasks() {
   });
   localStorage.setItem('taskSlots', JSON.stringify(taskSlotsMap));
 
+  // Filter tasks by activeFilter
+  const filteredTasks = activeFilter === 'All'
+    ? tasks
+    : tasks.filter(t => t.tag === activeFilter);
+
   // Sort tasks chronologically by slotIndex
-  const sortedTasks = [...tasks].sort((a, b) => {
+  const sortedTasks = [...filteredTasks].sort((a, b) => {
     return (taskSlotsMap[a.id] || 0) - (taskSlotsMap[b.id] || 0);
   });
 
   if (sortedTasks.length === 0) {
-    timelineList.innerHTML = `<div style="color:var(--text-secondary); text-align:center; padding: 20px; font-style:italic; font-size:0.95rem;">No tasks scheduled on your timeline. Add topics above!</div>`;
+    timelineList.innerHTML = `<div style="color:var(--text-secondary); text-align:center; padding: 20px; font-style:italic; font-size:0.95rem;">No tasks scheduled under '${activeFilter}'. Add topics above!</div>`;
   } else {
     sortedTasks.forEach((task) => {
       const slotIndex = taskSlotsMap[task.id] !== undefined ? taskSlotsMap[task.id] : 0;
@@ -108,7 +116,10 @@ function renderTasks() {
             <div class="timeline-checkbox ${task.completed ? 'checked' : ''}" onclick="toggleTaskById(${task.id})">
               ${task.completed ? '✓' : ''}
             </div>
-            <span class="timeline-task-text ${task.completed ? 'completed' : ''}">${task.text}</span>
+            <span class="timeline-task-text ${task.completed ? 'completed' : ''}">
+              ${task.text}
+              ${task.tag ? `<span class="tag-badge">${task.tag}</span>` : ''}
+            </span>
           </div>
           <div class="timeline-actions">
             <button class="timeline-btn reschedule-btn" onclick="rescheduleTask(${task.id})" title="Reschedule slot">🔄</button>
@@ -131,14 +142,16 @@ function renderTasks() {
 
 async function addTask() {
   const input = document.getElementById("taskInput");
+  const tagInput = document.getElementById("taskTagInput");
   const taskText = input.value.trim();
+  const taskTag = tagInput ? tagInput.value.trim() : "";
   if (taskText === "") return;
   
   try {
       const res = await fetch('/api/tasks', {
           method: 'POST',
           headers: getAuthHeaders(),
-          body: JSON.stringify({ text: taskText, completed: false })
+          body: JSON.stringify({ text: taskText, completed: false, tag: taskTag })
       });
       if (res.ok) {
           const newTask = await res.json();
@@ -150,6 +163,7 @@ async function addTask() {
           tasks.push(newTask);
           renderTasks();
           input.value = "";
+          if (tagInput) tagInput.value = "";
       }
   } catch(err) { console.error(err); }
 }
@@ -550,44 +564,67 @@ function appendChatMessage(text, sender) {
  * Renders the Spaced Repetition mastery simulator controls and scheduled preview timelines
  */
 function renderSpacedRepetition() {
+    // Render tag filters synchronously to keep filters in sync
+    renderTagFilters();
+
     const topicsList = document.getElementById("srTopicsList");
+    
+    // Filter topics by activeFilter
+    const filteredTopics = activeFilter === 'All'
+        ? window.studyTopics
+        : window.studyTopics.filter(t => t.tag === activeFilter);
+
     if (topicsList) {
         topicsList.innerHTML = "";
-        window.studyTopics.forEach(topic => {
-            const row = document.createElement("div");
-            row.className = `topic-mastery-row ${topic.mastered ? 'mastered' : ''}`;
-            row.innerHTML = `
-                <div style="display:flex; flex-direction:column; gap:4px; align-items:flex-start; text-align:left;">
-                    <span class="step-badge" style="background:rgba(99,102,241,0.1); color:var(--accent-indigo); font-size:0.65rem; padding: 2px 8px; border-radius:6px; border:1px solid rgba(99,102,241,0.2); font-weight:800; text-transform:uppercase;">
-                        ${topic.grade}
-                    </span>
-                    <span class="topic-name-label" style="font-size:1.02rem; font-weight:800; margin-top:2px;">
-                        ${topic.subject}
-                    </span>
-                    <span style="font-size:0.82rem; color:var(--text-secondary);">
-                        ${topic.topic}
-                    </span>
-                </div>
-                ${topic.mastered 
-                  ? `<button class="btn-master completed" style="pointer-events:none;">Mastered ✓</button>`
-                      : `<div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-                           <a href="/feynman?topicId=${topic.id}"><button class="btn-master-outline">🎓 Practice Feynman Mode</button></a>
-                           <button class="btn-master" onclick="window.markTopicAsMastered('${topic.id}')">Mark Mastered</button>
-                         </div>`
-                }
-            `;
-            topicsList.appendChild(row);
-        });
+        
+        if (filteredTopics.length === 0) {
+            topicsList.innerHTML = `<div style="color:var(--text-secondary); text-align:center; padding: 20px; font-style:italic; font-size:0.95rem;">No topics scheduled under '${activeFilter}'. Add one above!</div>`;
+        } else {
+            filteredTopics.forEach(topic => {
+                const row = document.createElement("div");
+                row.className = `topic-mastery-row ${topic.mastered ? 'mastered' : ''}`;
+                row.innerHTML = `
+                    <div style="display:flex; flex-direction:column; gap:4px; align-items:flex-start; text-align:left;">
+                        <div style="display:flex; align-items:center; gap:6px;">
+                            <span class="step-badge" style="background:rgba(99,102,241,0.1); color:var(--accent-indigo); font-size:0.65rem; padding: 2px 8px; border-radius:6px; border:1px solid rgba(99,102,241,0.2); font-weight:800; text-transform:uppercase;">
+                                ${topic.grade}
+                            </span>
+                            ${topic.tag ? `<span class="tag-badge">${topic.tag}</span>` : ''}
+                        </div>
+                        <span class="topic-name-label" style="font-size:1.02rem; font-weight:800; margin-top:2px;">
+                            ${topic.subject}
+                        </span>
+                        <span style="font-size:0.82rem; color:var(--text-secondary);">
+                            ${topic.topic}
+                        </span>
+                    </div>
+                    ${topic.mastered 
+                      ? `<button class="btn-master completed" style="pointer-events:none;">Mastered ✓</button>`
+                          : `<div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                               <a href="/feynman?topicId=${topic.id}"><button class="btn-master-outline">🎓 Practice Feynman Mode</button></a>
+                               <button class="btn-master" onclick="window.markTopicAsMastered('${topic.id}')">Mark Mastered</button>
+                             </div>`
+                    }
+                `;
+                topicsList.appendChild(row);
+            });
+        }
     }
     
     const reviewsList = document.getElementById("srReviewsList");
     if (reviewsList) {
         reviewsList.innerHTML = "";
         
-        if (window.calendarStore.length === 0) {
-            reviewsList.innerHTML = `<div style="color:var(--text-secondary); text-align:center; padding: 20px; font-style:italic; font-size:0.88rem;">No reviews scheduled. Mark a topic as mastered above to trigger spaced schedule intervals!</div>`;
+        const filteredEvents = window.calendarStore.filter(evt => {
+            if (activeFilter === 'All') return true;
+            const associatedTopic = window.studyTopics.find(t => t.id === evt.topicId);
+            return associatedTopic && associatedTopic.tag === activeFilter;
+        });
+        
+        if (filteredEvents.length === 0) {
+            reviewsList.innerHTML = `<div style="color:var(--text-secondary); text-align:center; padding: 20px; font-style:italic; font-size:0.88rem;">No reviews scheduled under '${activeFilter}'. Mark a topic as mastered above to trigger spaced schedule intervals!</div>`;
         } else {
-            const sortedEvents = [...window.calendarStore].sort((a, b) => {
+            const sortedEvents = [...filteredEvents].sort((a, b) => {
                 return new Date(a.startDateTime) - new Date(b.startDateTime);
             });
             
@@ -599,16 +636,22 @@ function renderSpacedRepetition() {
                     year: 'numeric' 
                 }) + ` at 9:00 AM`;
                 
+                const associatedTopic = window.studyTopics.find(t => t.id === evt.topicId);
+                const tagText = associatedTopic && associatedTopic.tag ? associatedTopic.tag : "";
+                
                 const card = document.createElement("div");
                 card.className = "review-schedule-card animate-fade-in-up stagger-1";
                 card.innerHTML = `
-                    <div class="review-card-info">
+                    <div class="review-card-info" style="text-align: left;">
+                        <div style="display:flex; align-items:center; gap:6px; margin-bottom: 4px;">
+                            <span class="step-badge step-badge-${evt.intervalStep}">
+                                Step ${evt.intervalStep}
+                            </span>
+                            ${tagText ? `<span class="tag-badge">${tagText}</span>` : ''}
+                        </div>
                         <span class="review-card-title">${evt.title}</span>
                         <span class="review-card-date">📅 ${formattedDate}</span>
                     </div>
-                    <span class="step-badge step-badge-${evt.intervalStep}">
-                        Step ${evt.intervalStep}
-                    </span>
                 `;
                 reviewsList.appendChild(card);
             });
@@ -624,21 +667,72 @@ function handleSRAddTopic(e) {
     const subjectInput = document.getElementById("srSubject");
     const topicInput = document.getElementById("srTopic");
     const gradeInput = document.getElementById("srGrade");
+    const tagInput = document.getElementById("srTag");
     
     if (!subjectInput || !topicInput || !gradeInput) return;
     
     const subject = subjectInput.value.trim();
     const topic = topicInput.value.trim();
     const grade = gradeInput.value.trim();
+    const tag = tagInput ? tagInput.value.trim() : "";
     
     if (!subject || !topic || !grade) return;
     
-    window.addNewTopic(subject, topic, grade);
+    window.addNewTopic(subject, topic, grade, tag);
     
     // Reset form fields
     subjectInput.value = "";
     topicInput.value = "";
     gradeInput.value = "";
+    if (tagInput) tagInput.value = "";
+}
+
+// --- Tag Filtering System for Authenticated Dashboard ---
+let activeFilter = 'All';
+
+function renderTagFilters() {
+    const container = document.getElementById("tagFilterContainer");
+    if (!container) return;
+    
+    // Gather all unique tags from tasks and studyTopics
+    const tags = new Set();
+    tasks.forEach(t => {
+        if (t.tag) tags.add(t.tag);
+    });
+    window.studyTopics.forEach(t => {
+        if (t.tag) tags.add(t.tag);
+    });
+    
+    const tagsArray = ['All', ...Array.from(tags)];
+    
+    if (tagsArray.length <= 1) {
+        container.innerHTML = "";
+        return;
+    }
+    
+    container.innerHTML = "";
+    const bar = document.createElement("div");
+    bar.className = "tag-filter-bar animate-fade-in-up stagger-1";
+    
+    const label = document.createElement("span");
+    label.innerText = "🔍 Filter Dashboard:";
+    label.style.cssText = "font-weight: 700; font-size: 0.88rem; color: var(--text-secondary); margin-right: 10px;";
+    bar.appendChild(label);
+    
+    tagsArray.forEach(tag => {
+        const pill = document.createElement("button");
+        pill.className = `filter-pill ${tag === activeFilter ? 'active' : ''}`;
+        pill.innerText = tag;
+        pill.onclick = () => {
+            activeFilter = tag;
+            renderTagFilters();
+            renderTasks();
+            renderSpacedRepetition();
+        };
+        bar.appendChild(pill);
+    });
+    
+    container.appendChild(bar);
 }
 
 window.handleSRAddTopic = handleSRAddTopic;
