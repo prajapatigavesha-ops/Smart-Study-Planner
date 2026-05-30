@@ -545,13 +545,12 @@ html.dark .timer h3 {
   width: 190px;
   height: 190px;
   transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  animation: mascotBlink 4s infinite;
   object-fit: contain;
   box-sizing: border-box;
 }
 
 .ai-mascot:hover {
-  transform: scale(1.08) rotate(5deg);
+  transform: scale(1.05);
 }
 
 .speech-bubble {
