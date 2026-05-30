@@ -178,16 +178,25 @@ button:hover, nav button:hover {
 }
 
 button.signup, .btn-primary {
-  background: linear-gradient(135deg, var(--primary-color), var(--text-secondary)) !important;
+  background: linear-gradient(135deg, #4f46e5, #6366f1) !important;
   color: #ffffff !important;
   border: none;
-}
-html.dark button.signup, html.dark .btn-primary {
-  color: #000000 !important;
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25) !important;
 }
 
 button.signup:hover, .btn-primary:hover {
-  background: linear-gradient(135deg, var(--primary-hover), var(--text-primary)) !important;
+  background: linear-gradient(135deg, #4338ca, #4f46e5) !important;
+  box-shadow: 0 6px 16px rgba(79, 70, 229, 0.4) !important;
+}
+
+html.dark button.signup, html.dark .btn-primary {
+  background: linear-gradient(135deg, #6366f1, #818cf8) !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3) !important;
+}
+
+html.dark button.signup:hover, html.dark .btn-primary:hover {
+  background: linear-gradient(135deg, #4f46e5, #6366f1) !important;
 }
 
 button.theme-toggle {
