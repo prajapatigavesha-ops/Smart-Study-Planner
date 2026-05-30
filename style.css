@@ -542,8 +542,8 @@ html.dark .timer h3 {
 }
 
 .ai-mascot {
-  width: 190px;
-  height: 190px;
+  width: 300px;
+  height: 300px;
   transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   object-fit: contain;
   box-sizing: border-box;
@@ -1876,8 +1876,8 @@ html, body {
     right: 20px !important;
   }
   .ai-mascot {
-    width: 100px !important;
-    height: 100px !important;
+    width: 140px !important;
+    height: 140px !important;
   }
   .chat-dialog {
     bottom: 110px !important;
