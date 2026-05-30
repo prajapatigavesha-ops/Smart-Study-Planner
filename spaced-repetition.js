@@ -68,43 +68,82 @@ function addNewTopic(subject, topic, grade, tag) {
  * Simulates marking a topic as mastered, generating its spaced repetition schedule,
  * updating the calendar store, and re-rendering views.
  */
-function markTopicAsMastered(topicId) {
+function toggleTopicMastery(topicId) {
     const topic = studyTopics.find(t => t.id === topicId);
     if (!topic) return;
     
-    // Set status to mastered
-    topic.mastered = true;
+    if (!topic.mastered) {
+        topic.mastered = true;
+        const titleText = `${topic.subject} - ${topic.topic} (${topic.grade})`;
+        const newEvents = generateSpacedRepetitionSchedule(topic.id, titleText);
+        calendarStore.unshift(...newEvents);
+    } else {
+        topic.mastered = false;
+        calendarStore = calendarStore.filter(e => e.topicId !== topicId);
+    }
     
-    // Construct personalized event title format
-    const titleText = `${topic.subject} - ${topic.topic} (${topic.grade})`;
-    
-    // Generate the 4 spaced repetition events
-    const newEvents = generateSpacedRepetitionSchedule(topic.id, titleText);
-    
-    // Append to calendar store
-    calendarStore.unshift(...newEvents);
-    
-    // Save to localStorage
     localStorage.setItem('studyTopics', JSON.stringify(studyTopics));
     localStorage.setItem('calendarStore', JSON.stringify(calendarStore));
     
-    // Console log the updated timeline state
-    console.log("=== SPACED REPETITION TIMELINE UPDATED ===");
-    console.log("Mastered Topic details:", titleText);
-    console.log("Generated Events Payload:", newEvents);
-    console.log("Full Calendar Store State:", calendarStore);
-    console.log("==========================================");
+    window.studyTopics = studyTopics;
+    window.calendarStore = calendarStore;
     
-    // Trigger UI updates
     if (typeof renderSpacedRepetition === 'function') {
         renderSpacedRepetition();
     }
 }
 
-// Global hooks
-// Global hooks to keep windows reference in sync
+function toggleReviewEvent(eventId) {
+    const event = calendarStore.find(e => e.id === eventId);
+    if (!event) return;
+    
+    event.status = event.status === 'completed' ? 'pending' : 'completed';
+    localStorage.setItem('calendarStore', JSON.stringify(calendarStore));
+    
+    window.calendarStore = calendarStore;
+    
+    if (typeof renderSpacedRepetition === 'function') {
+        renderSpacedRepetition();
+    }
+}
+
+function deleteReviewEvent(eventId) {
+    if (confirm("Are you sure you want to delete this review event?")) {
+        calendarStore = calendarStore.filter(e => e.id !== eventId);
+        localStorage.setItem('calendarStore', JSON.stringify(calendarStore));
+        
+        window.calendarStore = calendarStore;
+        
+        if (typeof renderSpacedRepetition === 'function') {
+            renderSpacedRepetition();
+        }
+    }
+}
+
+function deleteTopic(topicId) {
+    if (confirm("Are you sure you want to delete this topic? This will also remove all scheduled review events for this topic.")) {
+        studyTopics = studyTopics.filter(t => t.id !== topicId);
+        calendarStore = calendarStore.filter(e => e.topicId !== topicId);
+        
+        localStorage.setItem('studyTopics', JSON.stringify(studyTopics));
+        localStorage.setItem('calendarStore', JSON.stringify(calendarStore));
+        
+        window.studyTopics = studyTopics;
+        window.calendarStore = calendarStore;
+        
+        if (typeof renderSpacedRepetition === 'function') {
+            renderSpacedRepetition();
+        }
+    }
+}
+
+// Global hooks to keep window reference in sync
 window.studyTopics = studyTopics;
 window.calendarStore = calendarStore;
 window.addNewTopic = addNewTopic;
 window.generateSpacedRepetitionSchedule = generateSpacedRepetitionSchedule;
-window.markTopicAsMastered = markTopicAsMastered;
+window.markTopicAsMastered = toggleTopicMastery; // For compatibility
+window.toggleTopicMastery = toggleTopicMastery;
+window.toggleReviewEvent = toggleReviewEvent;
+window.deleteReviewEvent = deleteReviewEvent;
+window.deleteTopic = deleteTopic;

@@ -670,13 +670,18 @@ function renderSpacedRepetition() {
                             ${topic.topic}
                         </span>
                     </div>
-                    ${topic.mastered 
-                      ? `<button class="btn-master completed" style="pointer-events:none;">Mastered ✓</button>`
+                    <div style="display:flex; gap:8px; align-items:center;">
+                        ${topic.mastered 
+                          ? `<button class="btn-master completed" onclick="window.toggleTopicMastery('${topic.id}')" style="cursor:pointer;">Mastered ✓</button>`
                           : `<div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
                                <a href="/feynman?topicId=${topic.id}"><button class="btn-master-outline">🎓 Practice Feynman Mode</button></a>
-                               <button class="btn-master" onclick="window.markTopicAsMastered('${topic.id}')">Mark Mastered</button>
+                               <button class="btn-master" onclick="window.toggleTopicMastery('${topic.id}')">Mark Mastered</button>
                              </div>`
-                    }
+                        }
+                        <button onclick="window.deleteTopic('${topic.id}')" class="btn-action-delete" title="Delete Topic" style="color: var(--danger-color); background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2); padding: 6px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s ease; border: none;">
+                            <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
+                        </button>
+                    </div>
                 `;
                 topicsList.appendChild(row);
             });
@@ -724,10 +729,34 @@ function renderSpacedRepetition() {
                         <span class="review-card-title">${evt.title}</span>
                         <span class="review-card-date">📅 ${formattedDate}</span>
                     </div>
+                    <div class="review-card-actions" style="display: flex; align-items: center; gap: 8px;">
+                        <!-- Practice Feynman Button -->
+                        ${evt.status !== 'completed' 
+                          ? `<a href="/feynman?topicId=${evt.topicId}" class="btn-action-feynman" title="Practice Feynman Mode" style="color: var(--accent-indigo); background: rgba(99,102,241,0.08); border: 1px solid rgba(99,102,241,0.2); padding: 6px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease;">
+                              <i data-lucide="book-open" style="width: 16px; height: 16px;"></i>
+                             </a>`
+                          : ''
+                        }
+                        
+                        <!-- Complete/Pending Toggle -->
+                        <button onclick="window.toggleReviewEvent('${evt.id}')" class="btn-action-complete" title="${evt.status === 'completed' ? 'Mark Pending' : 'Mark Completed'}" style="color: ${evt.status === 'completed' ? 'var(--accent-mint)' : 'var(--text-secondary)'}; background: ${evt.status === 'completed' ? 'rgba(52,211,153,0.1)' : 'rgba(255,255,255,0.05)'}; border: 1px solid ${evt.status === 'completed' ? 'rgba(52,211,153,0.3)' : 'var(--glass-border)'}; padding: 6px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s ease;">
+                            <i data-lucide="${evt.status === 'completed' ? 'check-circle' : 'circle'}" style="width: 16px; height: 16px;"></i>
+                        </button>
+                        
+                        <!-- Delete Event -->
+                        <button onclick="window.deleteReviewEvent('${evt.id}')" class="btn-action-delete" title="Delete Review Event" style="color: var(--danger-color); background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2); padding: 6px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s ease;">
+                            <i data-lucide="trash-2" style="width: 16px; height: 16px;"></i>
+                        </button>
+                    </div>
                 `;
                 reviewsList.appendChild(card);
             });
         }
+    }
+    
+    // Trigger Lucide icons generation
+    if (typeof lucide !== 'undefined') {
+        lucide.createIcons();
     }
 }
 

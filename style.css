@@ -1261,12 +1261,42 @@ html:not(.dark) .btn-master:hover {
   border-color: var(--accent-mint) !important;
   color: #020617 !important;
   box-shadow: none !important;
-  pointer-events: none;
+  cursor: pointer;
   font-size: 0.75rem;
+  transition: all 0.2s ease;
+}
+
+.btn-master.completed:hover {
+  transform: scale(1.05);
+  filter: brightness(1.1);
 }
 
 html:not(.dark) .btn-master.completed {
   color: #fff !important;
+}
+
+/* Timeline action buttons styling */
+.btn-action-feynman,
+.btn-action-complete,
+.btn-action-delete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-action-feynman:hover,
+.btn-action-complete:hover {
+  transform: translateY(-2px) scale(1.1);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
+}
+
+.btn-action-delete:hover {
+  transform: translateY(-2px) scale(1.1);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.25);
 }
 
 .reviews-timeline-wrapper {
