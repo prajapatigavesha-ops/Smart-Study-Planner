@@ -20,42 +20,144 @@ app.use(express.json());
 // Serve static files from the current directory
 app.use(express.static(__dirname));
 
-// Initialize SQLite database
-const db = new sqlite3.Database('./database.sqlite', (err) => {
-    if (err) {
-        console.error("Error opening database " + err.message);
-    } else {
-        console.log("Connected to the SQLite database.");
-        // Create tables
-        db.serialize(() => {
-            db.run(`CREATE TABLE IF NOT EXISTS users (
+// Hybrid Database wrapper for local SQLite and Render Cloud PostgreSQL
+class HybridDatabase {
+    constructor() {
+        this.isPg = !!process.env.DATABASE_URL;
+        if (this.isPg) {
+            const { Pool } = require('pg');
+            this.pool = new Pool({
+                connectionString: process.env.DATABASE_URL,
+                ssl: { rejectUnauthorized: false }
+            });
+            console.log("Connected to PostgreSQL Cloud Database.");
+            this.initPg();
+        } else {
+            this.sqliteDb = new sqlite3.Database('./database.sqlite', (err) => {
+                if (err) console.error("Error opening SQLite: " + err.message);
+                else console.log("Connected to the local SQLite database.");
+            });
+            this.initSqlite();
+        }
+    }
+
+    initPg() {
+        this.pool.query(`CREATE TABLE IF NOT EXISTS users (
+            id SERIAL PRIMARY KEY,
+            username VARCHAR(255) UNIQUE,
+            password VARCHAR(255)
+        )`);
+        this.pool.query(`CREATE TABLE IF NOT EXISTS tasks (
+            id SERIAL PRIMARY KEY,
+            userId INTEGER,
+            text TEXT,
+            completed BOOLEAN,
+            tag VARCHAR(255)
+        )`);
+        this.pool.query(`CREATE TABLE IF NOT EXISTS stats (
+            userId INTEGER PRIMARY KEY,
+            totalStudyTime INTEGER DEFAULT 0,
+            sessionsCompleted INTEGER DEFAULT 0
+        )`);
+    }
+
+    initSqlite() {
+        this.sqliteDb.serialize(() => {
+            this.sqliteDb.run(`CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 username TEXT UNIQUE,
                 password TEXT
             )`);
-            
-            db.run(`CREATE TABLE IF NOT EXISTS tasks (
+            this.sqliteDb.run(`CREATE TABLE IF NOT EXISTS tasks (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 userId INTEGER,
                 text TEXT,
                 completed BOOLEAN
             )`);
-            
-            // Add column 'tag' to tasks table if it does not exist
-            db.run(`ALTER TABLE tasks ADD COLUMN tag TEXT`, (err) => {
-                if (err) {
-                    // Ignore error if column already exists
-                }
-            });
-            
-            db.run(`CREATE TABLE IF NOT EXISTS stats (
+            this.sqliteDb.run(`ALTER TABLE tasks ADD COLUMN tag TEXT`, (err) => {});
+            this.sqliteDb.run(`CREATE TABLE IF NOT EXISTS stats (
                 userId INTEGER PRIMARY KEY,
                 totalStudyTime INTEGER DEFAULT 0,
                 sessionsCompleted INTEGER DEFAULT 0
             )`);
         });
     }
-});
+
+    formatSql(sql) {
+        if (!this.isPg) return sql;
+        let index = 1;
+        return sql.replace(/\?/g, () => `$${index++}`);
+    }
+
+    run(sql, params, callback) {
+        if (typeof params === 'function') {
+            callback = params;
+            params = [];
+        }
+        if (this.isPg) {
+            const pgSql = this.formatSql(sql);
+            let querySql = pgSql;
+            if (sql.trim().toUpperCase().startsWith('INSERT')) {
+                if (!pgSql.toUpperCase().includes('RETURNING')) {
+                    querySql = pgSql + ' RETURNING id';
+                }
+            }
+            this.pool.query(querySql, params, (err, res) => {
+                if (err) {
+                    if (callback) callback(err);
+                    return;
+                }
+                const context = {
+                    changes: res.rowCount,
+                    lastID: (res.rows && res.rows[0]) ? res.rows[0].id : null
+                };
+                if (callback) callback.call(context, null);
+            });
+        } else {
+            this.sqliteDb.run(sql, params, callback);
+        }
+    }
+
+    get(sql, params, callback) {
+        if (typeof params === 'function') {
+            callback = params;
+            params = [];
+        }
+        if (this.isPg) {
+            const pgSql = this.formatSql(sql);
+            this.pool.query(pgSql, params, (err, res) => {
+                if (err) {
+                    if (callback) callback(err);
+                    return;
+                }
+                if (callback) callback(null, res.rows[0] || null);
+            });
+        } else {
+            this.sqliteDb.get(sql, params, callback);
+        }
+    }
+
+    all(sql, params, callback) {
+        if (typeof params === 'function') {
+            callback = params;
+            params = [];
+        }
+        if (this.isPg) {
+            const pgSql = this.formatSql(sql);
+            this.pool.query(pgSql, params, (err, res) => {
+                if (err) {
+                    if (callback) callback(err);
+                    return;
+                }
+                if (callback) callback(null, res.rows || []);
+            });
+        } else {
+            this.sqliteDb.all(sql, params, callback);
+        }
+    }
+}
+
+const db = new HybridDatabase();
 
 // Middleware to authenticate JWT token
 function authenticateToken(req, res, next) {
