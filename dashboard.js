@@ -31,6 +31,7 @@ document.addEventListener("DOMContentLoaded", () => {
     checkStreak();
     fetchTasks();
     fetchStats();
+    cleanMascotBackgrounds();
     if (typeof renderSpacedRepetition === 'function') {
         renderSpacedRepetition();
     }
@@ -808,3 +809,113 @@ function renderTagFilters() {
 
 window.handleSRAddTopic = handleSRAddTopic;
 window.renderSpacedRepetition = renderSpacedRepetition;
+
+// --- Dynamic Client-Side Background Removal ---
+function removeMascotBackground(img) {
+    if (!img) return;
+    
+    const processImage = () => {
+        try {
+            if (img.dataset.bgRemoved === 'true') return;
+            if (img.src.startsWith('data:image/')) return;
+            
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            const width = img.naturalWidth || img.width;
+            const height = img.naturalHeight || img.height;
+            
+            if (width === 0 || height === 0) return;
+            
+            canvas.width = width;
+            canvas.height = height;
+            ctx.drawImage(img, 0, 0);
+            
+            const imgData = ctx.getImageData(0, 0, width, height);
+            const data = imgData.data;
+            
+            // Seed background color from top-left pixel
+            const bgR = data[0];
+            const bgG = data[1];
+            const bgB = data[2];
+            
+            const queue = [];
+            const visited = new Uint8Array(width * height);
+            
+            // Add all border pixels to queue
+            for (let x = 0; x < width; x++) {
+                queue.push(x, 0);
+                visited[0 * width + x] = 1;
+                queue.push(x, height - 1);
+                visited[(height - 1) * width + x] = 1;
+            }
+            for (let y = 1; y < height - 1; y++) {
+                queue.push(0, y);
+                visited[y * width + 0] = 1;
+                queue.push(width - 1, y);
+                visited[y * width + (width - 1)] = 1;
+            }
+            
+            // Flood fill tolerance to cover starry aura/clouds
+            const tolerance = 80;
+            let head = 0;
+            
+            while (head < queue.length) {
+                const cx = queue[head++];
+                const cy = queue[head++];
+                const idx = (cy * width + cx) * 4;
+                
+                const r = data[idx];
+                const g = data[idx + 1];
+                const b = data[idx + 2];
+                
+                const diff = Math.sqrt(
+                    (r - bgR) * (r - bgR) +
+                    (g - bgG) * (g - bgG) +
+                    (b - bgB) * (b - bgB)
+                );
+                
+                if (diff <= tolerance) {
+                    data[idx + 3] = 0; // Transparent
+                    
+                    const neighbors = [
+                        cx - 1, cy,
+                        cx + 1, cy,
+                        cx, cy - 1,
+                        cx, cy + 1
+                    ];
+                    
+                    for (let i = 0; i < neighbors.length; i += 2) {
+                        const nx = neighbors[i];
+                        const ny = neighbors[i + 1];
+                        
+                        if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+                            const vIdx = ny * width + nx;
+                            if (visited[vIdx] === 0) {
+                                visited[vIdx] = 1;
+                                queue.push(nx, ny);
+                            }
+                        }
+                    }
+                }
+            }
+            
+            ctx.putImageData(imgData, 0, 0);
+            img.src = canvas.toDataURL('image/png');
+            img.dataset.bgRemoved = 'true';
+        } catch (e) {
+            console.error('Failed to remove mascot background client-side:', e);
+        }
+    };
+    
+    if (img.complete) {
+        processImage();
+    } else {
+        img.onload = processImage;
+    }
+}
+
+function cleanMascotBackgrounds() {
+    const images = document.querySelectorAll('img[src*="robot_mascot.png"], img.ai-mascot');
+    images.forEach(removeMascotBackground);
+}
+window.cleanMascotBackgrounds = cleanMascotBackgrounds;
