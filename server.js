@@ -349,6 +349,130 @@ app.post('/api/chat', (req, res, next) => {
     }
 });
 
+// --- AI Syllabus Parsing Route ---
+app.post('/api/parse-syllabus', authenticateToken, async (req, res) => {
+    const { text } = req.body;
+    if (!text || typeof text !== 'string') {
+        return res.status(400).json({ error: "Syllabus text is required." });
+    }
+    
+    if (process.env.OPENAI_API_KEY && (process.env.OPENAI_API_KEY.startsWith('sk-') || process.env.OPENAI_API_KEY.startsWith('proj-'))) {
+        try {
+            const systemPrompt = `You are a professional curriculum and syllabus parser. 
+Extract academic subjects and their corresponding specific topics or chapters from the provided text.
+Format the output as a strict, valid JSON array of objects. Do not wrap the JSON output in markdown code blocks (like \`\`\`json ... \`\`\`), just return the raw JSON text string itself.
+Each object must contain the following keys:
+- subject: string (The subject or course name, e.g. "Physics", "European History", "Computer Science")
+- topic: string (The specific chapter or topic title, e.g. "Kinematics", "The French Revolution", "Data Structures")
+- grade: string (The class level/grade if mentioned, e.g. "Grade 10", "College 101", otherwise default to "General")
+- tag: string (A category tag such as "Unit 1", "Module A", or the main theme, default to "Syllabus")
+
+If you find multiple topics for the same subject, list them as separate objects in the array. Exclude introductory remarks, page numbers, or general instructions.
+Example format:
+[
+  {"subject": "Biology", "topic": "Cell structure and function", "grade": "General", "tag": "Unit 1"},
+  {"subject": "Biology", "topic": "Photosynthesis", "grade": "General", "tag": "Unit 1"}
+]`;
+
+            const completion = await openai.chat.completions.create({
+                messages: [
+                    { role: "system", content: systemPrompt },
+                    { role: "user", content: `Please parse this syllabus text:\n\n${text}` }
+                ],
+                model: "gpt-3.5-turbo",
+                temperature: 0.1
+            });
+            
+            let replyText = completion.choices[0].message.content.trim();
+            if (replyText.startsWith('```')) {
+                replyText = replyText.replace(/^```(json)?\n?/, '').replace(/\n?```$/, '').trim();
+            }
+            
+            const parsedData = JSON.parse(replyText);
+            res.json({ topics: parsedData });
+        } catch (err) {
+            console.error("OpenAI Syllabus Parsing Error:", err.message);
+            const fallbackTopics = localRegexSyllabusParser(text);
+            res.json({ topics: fallbackTopics, warning: `OpenAI parsing failed (${err.message}). Used fallback parser.` });
+        }
+    } else {
+        const fallbackTopics = localRegexSyllabusParser(text);
+        res.json({ topics: fallbackTopics, info: "Using local regex-based syllabus parser fallback (No OpenAI key set)." });
+    }
+});
+
+// A smart offline parsing helper
+function localRegexSyllabusParser(text) {
+    const lines = text.split('\n');
+    const topics = [];
+    let currentSubject = "General Subject";
+    let currentGrade = "General";
+    
+    for (let line of lines) {
+        line = line.trim();
+        if (!line) continue;
+        
+        const subjectHeaderMatch = line.match(/^(?:Subject|Course|Class)\s*:\s*(.+)$/i) || 
+                                   line.match(/^#{1,4}\s+(.+)$/) ||
+                                   (line.length < 40 && line.endsWith(':') && !line.includes('http'));
+                                   
+        if (subjectHeaderMatch) {
+            let candidate = typeof subjectHeaderMatch === 'string' ? subjectHeaderMatch : subjectHeaderMatch[1];
+            candidate = candidate.replace(/^[#\s*]+|[:]+$/g, '').trim();
+            if (candidate.toLowerCase() !== 'syllabus' && candidate.toLowerCase() !== 'topics' && candidate.length > 2) {
+                currentSubject = candidate;
+            }
+            continue;
+        }
+        
+        const gradeMatch = line.match(/(?:Grade|Class)\s*[:\-]?\s*(\d+|[a-zA-Z\s\d]+)/i);
+        if (gradeMatch && line.length < 30) {
+            currentGrade = gradeMatch[1].trim();
+            continue;
+        }
+        
+        const bulletMatch = line.match(/^[\*\-\+•]\s+(.+)$/) || 
+                            line.match(/^\d+\.\s+(.+)$/);
+                            
+        if (bulletMatch) {
+            const topicText = bulletMatch[1].trim();
+            if (topicText.length > 3 && topicText.length < 120 && !topicText.toLowerCase().includes('page ')) {
+                topics.push({
+                    subject: currentSubject,
+                    topic: topicText,
+                    grade: currentGrade,
+                    tag: "Syllabus"
+                });
+            }
+        } else if (line.length > 5 && line.length < 80 && currentSubject !== "General Subject" && !line.includes(' ')) {
+            topics.push({
+                subject: currentSubject,
+                topic: line,
+                grade: currentGrade,
+                tag: "Syllabus"
+            });
+        }
+    }
+    
+    if (topics.length === 0) {
+        let linesCount = 0;
+        for (let line of lines) {
+            line = line.trim();
+            if (line.length > 6 && line.length < 70 && linesCount < 15) {
+                topics.push({
+                    subject: currentSubject,
+                    topic: line,
+                    grade: currentGrade,
+                    tag: "Syllabus"
+                });
+                linesCount++;
+            }
+        }
+    }
+    
+    return topics;
+}
+
 // Basic endpoint
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));

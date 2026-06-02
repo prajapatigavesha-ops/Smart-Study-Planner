@@ -948,3 +948,294 @@ function cleanMascotBackgrounds() {
     images.forEach(removeMascotBackground);
 }
 window.cleanMascotBackgrounds = cleanMascotBackgrounds;
+
+// --- AI Syllabus Parser Modal Controllers ---
+
+let parsedSyllabusTopics = [];
+
+function openSyllabusModal() {
+    const modal = document.getElementById("syllabusModal");
+    if (modal) {
+        modal.style.display = "flex";
+        showSyllabusStep('upload');
+        document.getElementById("syllabusTextPaste").value = "";
+        document.getElementById("syllabusFileInput").value = "";
+        if (window.lucide) {
+            window.lucide.createIcons();
+        }
+        setupSyllabusDropZone();
+    }
+}
+window.openSyllabusModal = openSyllabusModal;
+
+function closeSyllabusModal() {
+    const modal = document.getElementById("syllabusModal");
+    if (modal) {
+        modal.style.display = "none";
+    }
+}
+window.closeSyllabusModal = closeSyllabusModal;
+
+function showSyllabusStep(stepName) {
+    const steps = {
+        upload: document.getElementById("syllabusUploadStep"),
+        loading: document.getElementById("syllabusLoadingStep"),
+        preview: document.getElementById("syllabusPreviewStep")
+    };
+    
+    Object.keys(steps).forEach(k => {
+        if (steps[k]) {
+            steps[k].style.display = (k === stepName) ? (k === 'preview' ? 'flex' : 'block') : 'none';
+        }
+    });
+}
+window.showSyllabusStep = showSyllabusStep;
+
+function setupSyllabusDropZone() {
+    const dropZone = document.getElementById("syllabusDropZone");
+    const fileInput = document.getElementById("syllabusFileInput");
+    if (!dropZone || !fileInput) return;
+    
+    // Prevent default drag behaviors
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, e => e.preventDefault(), false);
+        document.body.addEventListener(eventName, e => e.preventDefault(), false);
+    });
+    
+    // Highlight drop zone when item is dragged over it
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => {
+            dropZone.classList.add('dragover');
+        }, false);
+    });
+    
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => {
+            dropZone.classList.remove('dragover');
+        }, false);
+    });
+    
+    // Handle dropped files
+    dropZone.addEventListener('drop', e => {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        if (files.length > 0) {
+            handleSyllabusFileSelection(files[0]);
+        }
+    });
+    
+    // Handle file selection from button
+    fileInput.onchange = (e) => {
+        if (fileInput.files.length > 0) {
+            handleSyllabusFileSelection(fileInput.files[0]);
+        }
+    };
+}
+
+async function handleSyllabusFileSelection(file) {
+    const allowedExtensions = ['pdf', 'txt', 'md'];
+    const extension = file.name.split('.').pop().toLowerCase();
+    if (!allowedExtensions.includes(extension)) {
+        alert("Unsupported file type! Please upload a PDF, TXT, or MD file.");
+        return;
+    }
+    
+    if (file.size > 5 * 1024 * 1024) {
+        alert("File is too large! Maximum limit is 5MB.");
+        return;
+    }
+    
+    showSyllabusStep('loading');
+    try {
+        let text = "";
+        if (extension === 'pdf') {
+            text = await extractTextFromPdf(file);
+        } else {
+            text = await extractTextFromTextFile(file);
+        }
+        
+        if (!text.trim()) {
+            throw new Error("No readable text found in file.");
+        }
+        
+        await sendTextToParser(text);
+    } catch (err) {
+        alert("Failed to parse file: " + err.message);
+        showSyllabusStep('upload');
+    }
+}
+
+function extractTextFromTextFile(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target.result);
+        reader.onerror = (err) => reject(err);
+        reader.readAsText(file);
+    });
+}
+
+function loadPdfJs() {
+    return new Promise((resolve, reject) => {
+        if (window['pdfjs-dist/build/pdf']) {
+            resolve(window['pdfjs-dist/build/pdf']);
+            return;
+        }
+        const script = document.createElement('script');
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js';
+        script.onload = () => {
+            resolve(window['pdfjs-dist/build/pdf']);
+        };
+        script.onerror = () => {
+            reject(new Error("Failed to load PDF.js engine"));
+        };
+        document.head.appendChild(script);
+    });
+}
+
+async function extractTextFromPdf(file) {
+    const pdfjsLib = await loadPdfJs();
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+    
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    let fullText = "";
+    
+    const maxPages = Math.min(pdf.numPages, 15);
+    for (let i = 1; i <= maxPages; i++) {
+        const page = await pdf.getPage(i);
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items.map(item => item.str).join(" ");
+        fullText += pageText + "\n";
+    }
+    return fullText;
+}
+
+async function submitSyllabusText() {
+    const text = document.getElementById("syllabusTextPaste").value.trim();
+    if (!text) {
+        alert("Please paste syllabus text or upload a file first!");
+        return;
+    }
+    
+    showSyllabusStep('loading');
+    try {
+        await sendTextToParser(text);
+    } catch (err) {
+        alert("Failed to parse syllabus: " + err.message);
+        showSyllabusStep('upload');
+    }
+}
+window.submitSyllabusText = submitSyllabusText;
+
+async function sendTextToParser(text) {
+    const res = await fetch('/api/parse-syllabus', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ text })
+    });
+    
+    if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || `Server returned status ${res.status}`);
+    }
+    
+    const data = await res.json();
+    parsedSyllabusTopics = data.topics || [];
+    
+    if (parsedSyllabusTopics.length === 0) {
+        throw new Error("No structured topics could be extracted. Check document format or paste clearer text.");
+    }
+    
+    renderSyllabusPreview(parsedSyllabusTopics);
+    showSyllabusStep('preview');
+}
+
+function renderSyllabusPreview(topics) {
+    const container = document.getElementById("syllabusChecklistContainer");
+    const countTag = document.getElementById("parsedCountTag");
+    if (!container) return;
+    
+    container.innerHTML = "";
+    if (countTag) {
+        countTag.innerText = `${topics.length} Topic${topics.length === 1 ? '' : 's'}`;
+    }
+    
+    const grouped = {};
+    topics.forEach((t, index) => {
+        const sub = t.subject || "General Subject";
+        if (!grouped[sub]) grouped[sub] = [];
+        grouped[sub].push({ topic: t, index });
+    });
+    
+    Object.keys(grouped).forEach(subject => {
+        const groupDiv = document.createElement("div");
+        groupDiv.className = "syllabus-subject-group";
+        
+        const titleDiv = document.createElement("div");
+        titleDiv.className = "syllabus-subject-title";
+        titleDiv.innerHTML = `<span>📚 ${subject}</span>`;
+        groupDiv.appendChild(titleDiv);
+        
+        grouped[subject].forEach(item => {
+            const row = document.createElement("div");
+            row.className = "syllabus-topic-row";
+            
+            const checkbox = document.createElement("input");
+            checkbox.type = "checkbox";
+            checkbox.className = "syllabus-topic-checkbox";
+            checkbox.style.cursor = "pointer";
+            checkbox.dataset.index = item.index;
+            checkbox.checked = true;
+            
+            const textInput = document.createElement("input");
+            textInput.type = "text";
+            textInput.className = "syllabus-topic-input";
+            textInput.value = item.topic.topic;
+            textInput.dataset.index = item.index;
+            textInput.onchange = (e) => {
+                parsedSyllabusTopics[item.index].topic = e.target.value;
+            };
+            
+            row.appendChild(checkbox);
+            row.appendChild(textInput);
+            groupDiv.appendChild(row);
+        });
+        
+        container.appendChild(groupDiv);
+    });
+}
+
+function selectAllSyllabus(checked) {
+    const checkboxes = document.querySelectorAll(".syllabus-topic-checkbox");
+    checkboxes.forEach(c => c.checked = checked);
+}
+window.selectAllSyllabus = selectAllSyllabus;
+
+function importSelectedSyllabusTopics() {
+    const checkboxes = document.querySelectorAll(".syllabus-topic-checkbox");
+    let importCount = 0;
+    
+    checkboxes.forEach(c => {
+        if (c.checked) {
+            const index = parseInt(c.dataset.index);
+            const data = parsedSyllabusTopics[index];
+            if (data && data.topic) {
+                if (typeof window.addNewTopic === 'function') {
+                    window.addNewTopic(data.subject, data.topic, data.grade, data.tag || data.subject);
+                    importCount++;
+                }
+            }
+        }
+    });
+    
+    if (importCount > 0) {
+        if (typeof renderTagFilters === 'function') {
+            renderTagFilters();
+        }
+        alert(`Successfully imported ${importCount} topic(s) to your study planner!`);
+        closeSyllabusModal();
+    } else {
+        alert("Please select at least one topic to import!");
+    }
+}
+window.importSelectedSyllabusTopics = importSelectedSyllabusTopics;

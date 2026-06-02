@@ -97,7 +97,10 @@
           <div class="spaced-box-container">
             <!-- Add Topic Form -->
             <div style="border-bottom: 1px solid var(--glass-border); padding-bottom: 20px; margin-bottom: 10px; text-align: left;">
-              <h3 style="margin: 0 0 12px 0; font-size: 1rem; font-weight: 700; color: var(--text-secondary);">Schedule Spaced Reviews</h3>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+                <h3 style="margin: 0; font-size: 1rem; font-weight: 700; color: var(--text-secondary);">Schedule Spaced Reviews</h3>
+                <button type="button" onclick="openSyllabusModal()" class="liquid-glass hover:scale-[1.02]" style="cursor: pointer; border-radius: 20px; padding: 6px 14px; font-size: 0.8rem; border: none; font-family: var(--font-body); font-weight: 600; background: rgba(255,255,255,0.06); color: var(--text-primary);">✨ Import Syllabus (AI)</button>
+              </div>
               <form id="srAddTopicForm" style="display:flex; flex-direction:column; gap:12px;" onsubmit="handleSRAddTopic(event)">
                 <div style="display:flex; gap:10px; flex-wrap: wrap;">
                   <input type="text" id="srSubject" placeholder="Subject (e.g. Biology, History)" required style="flex:1; min-width: 140px; padding: 10px 16px !important; font-size: 0.9rem !important;">
@@ -197,6 +200,72 @@
 
   <!-- Custom Glassmorphic Tooltip Container -->
   <div id="chart-tooltip" style="opacity: 0;"></div>
+
+  <!-- Syllabus Import Modal -->
+  <div id="syllabusModal" class="modal-overlay" style="display: none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 style="margin: 0; font-size: 1.3rem; font-weight: 800; display: flex; align-items: center; gap: 8px;">📚 AI Syllabus Auto-Parser</h2>
+        <button onclick="closeSyllabusModal()" style="background: transparent; border: none; font-size: 1.4rem; cursor: pointer; color: var(--text-secondary);">&times;</button>
+      </div>
+      <div class="modal-body" style="padding: 20px; display: flex; flex-direction: column; gap: 16px;">
+        
+        <!-- Step 1: Upload or Paste -->
+        <div id="syllabusUploadStep" style="display: flex; flex-direction: column; gap: 16px;">
+          <p style="margin: 0; font-size: 0.9rem; color: var(--text-secondary); line-height: 1.4;">
+            Upload your course syllabus file (.pdf, .txt, .md) or paste the text content directly below. Nova will extract the subjects and topics to create spaced repetition schedules for you.
+          </p>
+          
+          <!-- Drag-and-drop zone -->
+          <div id="syllabusDropZone" class="drop-zone">
+            <i data-lucide="upload-cloud" style="width: 32px; height: 32px; color: var(--accent-indigo);"></i>
+            <p style="margin: 8px 0 4px 0; font-weight: 600; font-size: 0.95rem;">Drag & drop your syllabus here</p>
+            <p style="margin: 0; font-size: 0.8rem; color: var(--text-secondary);">Supports PDF, TXT, or MD (Max 5MB)</p>
+            <input type="file" id="syllabusFileInput" accept=".pdf,.txt,.md" style="display: none;">
+            <button class="btn-primary" onclick="document.getElementById('syllabusFileInput').click()" style="margin-top: 10px; font-size: 0.8rem; padding: 6px 16px; border-radius: 20px;">Browse Files</button>
+          </div>
+          
+          <div style="text-align: center; font-weight: 600; color: var(--text-secondary); font-size: 0.8rem; letter-spacing: 0.05em;">— OR PASTE SYLLABUS TEXT —</div>
+          
+          <!-- Paste Text Area -->
+          <textarea id="syllabusTextPaste" placeholder="Paste syllabus text here (e.g. Course: Math 101. Chapters: 1. Limits, 2. Derivatives, 3. Integrals...)" style="height: 100px; resize: vertical; padding: 12px; border-radius: 12px; background: rgba(255,255,255,0.03); border: 1px solid var(--glass-border); color: var(--text-primary); font-family: var(--font-body); font-size: 0.9rem; line-height: 1.4; outline: none;"></textarea>
+          
+          <button id="btnParseSyllabus" onclick="submitSyllabusText()" class="btn-primary" style="padding: 10px; font-weight: 600; border-radius: 30px; cursor: pointer;">✨ Extract Topics with AI</button>
+        </div>
+
+        <!-- Step 2: Loading Overlay -->
+        <div id="syllabusLoadingStep" style="display: none; text-align: center; padding: 30px 10px;">
+          <div class="spinner" style="margin: 0 auto 15px auto;"></div>
+          <h3 style="margin: 0 0 8px 0; font-weight: 700;">Nova is parsing your syllabus...</h3>
+          <p style="margin: 0; font-size: 0.85rem; color: var(--text-secondary);">Extracting subjects, chapters, and units. Please wait.</p>
+        </div>
+
+        <!-- Step 3: Preview and Select -->
+        <div id="syllabusPreviewStep" style="display: none; flex-direction: column; gap: 16px;">
+          <h3 style="margin: 0; font-size: 1.05rem; font-weight: 700; display: flex; justify-content: space-between; align-items: center;">
+            <span>📋 Parsed Topics Preview</span>
+            <span id="parsedCountTag" style="font-size: 0.8rem; font-weight: 600; background: rgba(255,255,255,0.08); padding: 2px 8px; border-radius: 10px; color: var(--accent-indigo);">0 Topics</span>
+          </h3>
+          <p style="margin: 0; font-size: 0.85rem; color: var(--text-secondary);">
+            Check or uncheck topics below. You can also edit names if needed.
+          </p>
+          
+          <!-- Scrollable checklist area -->
+          <div id="syllabusChecklistContainer" style="max-height: 200px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 2px;">
+            <!-- Rendered list -->
+          </div>
+          
+          <div style="display: flex; gap: 10px; margin-top: 5px;">
+            <button onclick="selectAllSyllabus(true)" style="flex: 1; padding: 8px; font-size: 0.8rem; border-radius: 10px; background: rgba(255,255,255,0.04); border: 1px solid var(--glass-border); color: var(--text-primary); cursor: pointer; font-family: var(--font-body); font-weight: 600;">Select All</button>
+            <button onclick="selectAllSyllabus(false)" style="flex: 1; padding: 8px; font-size: 0.8rem; border-radius: 10px; background: rgba(255,255,255,0.04); border: 1px solid var(--glass-border); color: var(--text-primary); cursor: pointer; font-family: var(--font-body); font-weight: 600;">Deselect All</button>
+          </div>
+          
+          <button id="btnImportSyllabus" onclick="importSelectedSyllabusTopics()" class="btn-primary" style="padding: 10px; font-weight: 600; border-radius: 30px; margin-top: 5px; cursor: pointer;">📥 Import Selected Topics</button>
+        </div>
+        
+      </div>
+    </div>
+  </div>
 
   </div> <!-- End content-wrapper -->
 
