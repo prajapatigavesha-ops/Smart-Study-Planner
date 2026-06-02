@@ -59,8 +59,17 @@ class HybridDatabase {
             totalStudyTime INTEGER DEFAULT 0,
             sessionsCompleted INTEGER DEFAULT 0
         )`);
+        this.pool.query(`CREATE TABLE IF NOT EXISTS syllabi (
+            id SERIAL PRIMARY KEY,
+            userId INTEGER,
+            fileName VARCHAR(255),
+            fileType VARCHAR(50),
+            fileSize INTEGER,
+            fileData TEXT,
+            uploadDate TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )`);
     }
-
+ 
     initSqlite() {
         this.sqliteDb.serialize(() => {
             this.sqliteDb.run(`CREATE TABLE IF NOT EXISTS users (
@@ -79,6 +88,15 @@ class HybridDatabase {
                 userId INTEGER PRIMARY KEY,
                 totalStudyTime INTEGER DEFAULT 0,
                 sessionsCompleted INTEGER DEFAULT 0
+            )`);
+            this.sqliteDb.run(`CREATE TABLE IF NOT EXISTS syllabi (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                userId INTEGER,
+                fileName TEXT,
+                fileType TEXT,
+                fileSize INTEGER,
+                fileData TEXT,
+                uploadDate DATETIME DEFAULT CURRENT_TIMESTAMP
             )`);
         });
     }
@@ -348,6 +366,211 @@ app.post('/api/chat', (req, res, next) => {
         }, 800);
     }
 });
+
+// --- AI Syllabus Manager Routes ---
+
+// 1. Upload syllabus file & parse topics
+app.post('/api/syllabi', authenticateToken, async (req, res) => {
+    const { fileName, fileType, fileSize, fileData, extractedText } = req.body;
+    
+    if (!fileName || !fileData) {
+        return res.status(400).json({ error: "fileName and fileData are required." });
+    }
+    
+    db.run(
+        `INSERT INTO syllabi (userId, fileName, fileType, fileSize, fileData) VALUES (?, ?, ?, ?, ?)`,
+        [req.user.id, fileName, fileType || 'application/octet-stream', fileSize || 0, fileData],
+        async function(err) {
+            if (err) {
+                console.error("DB Save Syllabus Error:", err.message);
+                return res.status(500).json({ error: "Failed to save syllabus file to database." });
+            }
+            
+            const syllabusId = this.lastID;
+            
+            if (extractedText && extractedText.trim()) {
+                const text = extractedText.trim();
+                
+                if (process.env.OPENAI_API_KEY && (process.env.OPENAI_API_KEY.startsWith('sk-') || process.env.OPENAI_API_KEY.startsWith('proj-'))) {
+                    try {
+                        const systemPrompt = `You are an expert academic coordinator and cognitive science assistant. Your task is to analyze the provided syllabus, lecture schedule, or course outline text and extract the core conceptual topics that a student needs to master.
+
+Goal: 
+Break down the text into distinct, manageable study topics perfectly optimized for Spaced Repetition and the Feynman Technique. Do not include administrative details (like grading policies, office hours, or textbook ISBNs). Focus only on the academic subjects and concepts.
+
+Output Format:
+You must respond strictly in JSON format. Do not include any conversational text, markdown formatting outside of the JSON block, or explanations. 
+
+JSON Structure Expected:
+{
+  "course_name": "Name of the course or 'General Syllabus Study Plan' if undetected",
+  "estimated_study_weeks": 12,
+  "topics": [
+    {
+      "title": "Short, clear topic name (e.g., 'Photosynthesis & Light Reactions')",
+      "description": "A 1-sentence overview of what the student needs to understand and explain.",
+      "category": "Subject category (e.g., Biology, Calculus, History)",
+      "difficulty": "Easy / Medium / Hard"
+    }
+  ]
+}`;
+
+                        const completion = await openai.chat.completions.create({
+                            messages: [
+                                { role: "system", content: systemPrompt },
+                                { role: "user", content: `Please parse this syllabus text:\n\n${text}` }
+                            ],
+                            model: "gpt-3.5-turbo",
+                            temperature: 0.1
+                        });
+                        
+                        let replyText = completion.choices[0].message.content.trim();
+                        if (replyText.startsWith('```')) {
+                            replyText = replyText.replace(/^```(json)?\n?/, '').replace(/\n?```$/, '').trim();
+                        }
+                        
+                        const parsedData = JSON.parse(replyText);
+                        return res.json({ id: syllabusId, parsed: parsedData });
+                    } catch (aiErr) {
+                        console.error("OpenAI Syllabus Parsing Error:", aiErr.message);
+                        const fallbackData = localRegexSyllabusParserV2(text);
+                        return res.json({ id: syllabusId, parsed: fallbackData, warning: "OpenAI parsing failed. Used local parser." });
+                    }
+                } else {
+                    const fallbackData = localRegexSyllabusParserV2(text);
+                    return res.json({ id: syllabusId, parsed: fallbackData, info: "Offline local parser fallback used." });
+                }
+            } else {
+                return res.json({ id: syllabusId, message: "Syllabus uploaded successfully without parsing." });
+            }
+        }
+    );
+});
+
+// 2. Fetch list of previously uploaded syllabi metadata (exclude large fileData for speed)
+app.get('/api/syllabi', authenticateToken, (req, res) => {
+    db.all(
+        `SELECT id, fileName, fileType, fileSize, uploadDate FROM syllabi WHERE userId = ? ORDER BY uploadDate DESC`,
+        [req.user.id],
+        (err, rows) => {
+            if (err) {
+                console.error("DB Fetch Syllabi Error:", err.message);
+                return res.status(500).json({ error: err.message });
+            }
+            res.json(rows);
+        }
+    );
+});
+
+// 3. Fetch single syllabus with file data for download
+app.get('/api/syllabi/:id', authenticateToken, (req, res) => {
+    db.get(
+        `SELECT id, fileName, fileType, fileSize, fileData, uploadDate FROM syllabi WHERE id = ? AND userId = ?`,
+        [req.params.id, req.user.id],
+        (err, row) => {
+            if (err) {
+                console.error("DB Fetch Syllabus File Error:", err.message);
+                return res.status(500).json({ error: err.message });
+            }
+            if (!row) {
+                return res.status(404).json({ error: "Syllabus not found." });
+            }
+            res.json(row);
+        }
+    );
+});
+
+// 4. Delete syllabus
+app.delete('/api/syllabi/:id', authenticateToken, (req, res) => {
+    db.run(
+        `DELETE FROM syllabi WHERE id = ? AND userId = ?`,
+        [req.params.id, req.user.id],
+        function(err) {
+            if (err) {
+                console.error("DB Delete Syllabus Error:", err.message);
+                return res.status(500).json({ error: err.message });
+            }
+            if (this.changes === 0) {
+                return res.status(404).json({ error: "Syllabus not found." });
+            }
+            res.json({ message: "Syllabus deleted successfully." });
+        }
+    );
+});
+
+// A smart offline parsing helper (matches new schema)
+function localRegexSyllabusParserV2(text) {
+    const lines = text.split('\n');
+    const topics = [];
+    let currentSubject = "General Subject";
+    let courseName = "General Syllabus Study Plan";
+    
+    for (let i = 0; i < Math.min(lines.length, 6); i++) {
+        const line = lines[i].trim();
+        if (line.toLowerCase().includes('syllabus') || line.toLowerCase().includes('course') || line.toLowerCase().includes('class')) {
+            courseName = line.replace(/^[#\s*]+|[:]+$/g, '').trim();
+            break;
+        }
+    }
+    
+    for (let line of lines) {
+        line = line.trim();
+        if (!line) continue;
+        
+        const subjectHeaderMatch = line.match(/^(?:Subject|Course|Class)\s*:\s*(.+)$/i) || 
+                                   line.match(/^#{1,4}\s+(.+)$/) ||
+                                   (line.length < 40 && line.endsWith(':') && !line.includes('http'));
+                                   
+        if (subjectHeaderMatch) {
+            let candidate = typeof subjectHeaderMatch === 'string' ? subjectHeaderMatch : subjectHeaderMatch[1];
+            candidate = candidate.replace(/^[#\s*]+|[:]+$/g, '').trim();
+            if (candidate.toLowerCase() !== 'syllabus' && candidate.toLowerCase() !== 'topics' && candidate.length > 2) {
+                currentSubject = candidate;
+            }
+            continue;
+        }
+        
+        const bulletMatch = line.match(/^[\*\-\+•]\s+(.+)$/) || 
+                            line.match(/^\d+\.\s+(.+)$/);
+                            
+        if (bulletMatch) {
+            const topicText = bulletMatch[1].trim();
+            if (topicText.length > 3 && topicText.length < 120 && !topicText.toLowerCase().includes('page ')) {
+                const diffs = ["Easy", "Medium", "Hard"];
+                const difficulty = diffs[topics.length % 3];
+                topics.push({
+                    title: topicText,
+                    description: `Understand the core principles and key mechanisms of ${topicText}.`,
+                    category: currentSubject,
+                    difficulty: difficulty
+                });
+            }
+        }
+    }
+    
+    if (topics.length === 0) {
+        let count = 0;
+        const diffs = ["Easy", "Medium", "Hard"];
+        for (let line of lines) {
+            line = line.trim();
+            if (line.length > 5 && line.length < 80 && count < 10) {
+                topics.push({
+                    title: line,
+                    description: `Review and explain the concepts relating to ${line}.`,
+                    category: currentSubject,
+                    difficulty: diffs[count % 3]
+                });
+                count++;
+            }
+        }
+    }
+    
+    return {
+        course_name: courseName,
+        estimated_study_weeks: 12,
+        topics: topics
+    };
+}
 
 // Basic endpoint
 app.get('/', (req, res) => {

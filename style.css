@@ -2161,3 +2161,173 @@ html.dark .tag-badge {
     transform: scaleY(0.05) scaleX(1.05);
   }
 }
+
+/* --- SYLLABUS MANAGER MODAL, TABLES, DROP-ZONE & BADGES --- */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(2, 6, 17, 0.82);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  z-index: 1500;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+.modal-content {
+  background: var(--glass-bg);
+  backdrop-filter: blur(30px);
+  -webkit-backdrop-filter: blur(30px);
+  border: 1px solid var(--glass-border);
+  border-radius: 24px;
+  box-shadow: var(--glass-shadow);
+  max-width: 550px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  animation: modalScaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  box-sizing: border-box;
+  color: var(--text-primary);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.drop-zone {
+  border: 2px dashed var(--glass-border);
+  border-radius: 16px;
+  padding: 24px;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.01);
+  transition: all 0.25s ease;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.drop-zone.dragover {
+  border-color: var(--accent-indigo);
+  background: rgba(99, 102, 241, 0.05);
+  transform: scale(1.01);
+}
+
+.drop-zone:hover {
+  border-color: var(--accent-indigo);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+/* History table styles */
+#syllabusTabHistory table th,
+#syllabusTabHistory table td {
+  border-bottom: 1px solid var(--glass-border);
+}
+
+#syllabusTabHistory table tbody tr {
+  transition: background 0.2s ease;
+}
+
+#syllabusTabHistory table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+/* Syllabus Checklist Styles */
+.syllabus-subject-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+  text-align: left;
+}
+
+.syllabus-subject-title {
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: var(--accent-indigo);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 4px 0 2px 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.syllabus-topic-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  transition: all 0.2s ease;
+}
+
+.syllabus-topic-row:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: var(--accent-indigo);
+}
+
+.syllabus-topic-input {
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  font-size: 0.88rem;
+  font-weight: 600;
+  width: 100%;
+  outline: none;
+  font-family: var(--font-body);
+}
+
+.syllabus-topic-input:focus {
+  border-bottom: 1px solid var(--accent-indigo);
+}
+
+/* Difficulty Badges styling */
+.difficulty-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.badge-easy {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+.badge-medium {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.25);
+}
+
+.badge-hard {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+.badge-general {
+  background: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.25);
+}

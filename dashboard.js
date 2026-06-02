@@ -948,3 +948,541 @@ function cleanMascotBackgrounds() {
     images.forEach(removeMascotBackground);
 }
 window.cleanMascotBackgrounds = cleanMascotBackgrounds;
+
+// --- AI Syllabus Manager Frontend Logic ---
+
+let parsedSyllabusTopics = [];
+let currentUploadFile = null;
+
+function openSyllabusManager() {
+    const modal = document.getElementById("syllabusManagerModal");
+    if (modal) {
+        modal.style.display = "flex";
+        switchSyllabusTab('history');
+        if (window.lucide) {
+            window.lucide.createIcons();
+        }
+        setupSyllabusDropZone();
+    }
+}
+window.openSyllabusManager = openSyllabusManager;
+
+function closeSyllabusManager() {
+    const modal = document.getElementById("syllabusManagerModal");
+    if (modal) {
+        modal.style.display = "none";
+    }
+}
+window.closeSyllabusManager = closeSyllabusManager;
+
+function switchSyllabusTab(tabName) {
+    const tabHistory = document.getElementById("tabMySyllabi");
+    const tabUpload = document.getElementById("tabUploadSyllabus");
+    const viewHistory = document.getElementById("syllabusTabHistory");
+    const viewUpload = document.getElementById("syllabusTabUpload");
+    
+    if (tabName === 'history') {
+        tabHistory.style.borderBottomColor = 'var(--accent-indigo)';
+        tabHistory.style.color = 'var(--text-primary)';
+        tabUpload.style.borderBottomColor = 'transparent';
+        tabUpload.style.color = 'var(--text-secondary)';
+        viewHistory.style.display = 'flex';
+        viewUpload.style.display = 'none';
+        fetchSyllabusHistory();
+    } else {
+        tabUpload.style.borderBottomColor = 'var(--accent-indigo)';
+        tabUpload.style.color = 'var(--text-primary)';
+        tabHistory.style.borderBottomColor = 'transparent';
+        tabHistory.style.color = 'var(--text-secondary)';
+        viewHistory.style.display = 'none';
+        viewUpload.style.display = 'flex';
+        resetUploadForm();
+    }
+}
+window.switchSyllabusTab = switchSyllabusTab;
+
+function resetUploadForm() {
+    document.getElementById("syllabusUploadForm").style.display = "flex";
+    document.getElementById("syllabusLoadingStep").style.display = "none";
+    document.getElementById("syllabusPreviewStep").style.display = "none";
+    document.getElementById("syllabusTextPaste").value = "";
+    document.getElementById("syllabusFileInput").value = "";
+    currentUploadFile = null;
+}
+
+// 1. Fetch file history list from backend
+async function fetchSyllabusHistory() {
+    const tableBody = document.getElementById("syllabusHistoryTableBody");
+    const emptyState = document.getElementById("syllabusHistoryEmptyState");
+    if (!tableBody) return;
+    
+    tableBody.innerHTML = "";
+    
+    try {
+        const res = await fetch('/api/syllabi', {
+            headers: getAuthHeaders()
+        });
+        
+        if (!res.ok) throw new Error("Failed to load syllabus history.");
+        const files = await res.json();
+        
+        if (files.length === 0) {
+            emptyState.style.display = "block";
+            return;
+        }
+        emptyState.style.display = "none";
+        
+        files.forEach(file => {
+            const row = document.createElement("tr");
+            
+            // File Name
+            const nameTd = document.createElement("td");
+            nameTd.style.padding = "12px 16px";
+            nameTd.style.fontWeight = "600";
+            nameTd.innerText = file.fileName;
+            row.appendChild(nameTd);
+            
+            // Uploaded date
+            const dateTd = document.createElement("td");
+            dateTd.style.padding = "12px 16px";
+            dateTd.style.color = "var(--text-secondary)";
+            dateTd.innerText = new Date(file.uploadDate).toLocaleDateString();
+            row.appendChild(dateTd);
+            
+            // File Size
+            const sizeTd = document.createElement("td");
+            sizeTd.style.padding = "12px 16px";
+            sizeTd.style.color = "var(--text-secondary)";
+            sizeTd.innerText = formatBytes(file.fileSize);
+            row.appendChild(sizeTd);
+            
+            // Actions
+            const actionsTd = document.createElement("td");
+            actionsTd.style.padding = "12px 16px";
+            actionsTd.style.textAlign = "right";
+            actionsTd.style.display = "flex";
+            actionsTd.style.gap = "8px";
+            actionsTd.style.justifyContent = "flex-end";
+            
+            // Download button
+            const btnDownload = document.createElement("button");
+            btnDownload.className = "timeline-btn";
+            btnDownload.innerHTML = `<i data-lucide="download" style="width: 16px; height: 16px;"></i>`;
+            btnDownload.onclick = () => downloadSyllabus(file.id);
+            btnDownload.title = "Download Syllabus File";
+            
+            // Delete button
+            const btnDelete = document.createElement("button");
+            btnDelete.className = "timeline-btn delete-btn";
+            btnDelete.innerHTML = `<i data-lucide="trash-2" style="width: 16px; height: 16px;"></i>`;
+            btnDelete.onclick = () => deleteSyllabus(file.id);
+            btnDelete.title = "Delete Syllabus File";
+            
+            actionsTd.appendChild(btnDownload);
+            actionsTd.appendChild(btnDelete);
+            row.appendChild(actionsTd);
+            
+            tableBody.appendChild(row);
+        });
+        
+        if (window.lucide) {
+            window.lucide.createIcons();
+        }
+    } catch (err) {
+        console.error(err);
+        tableBody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding: 20px; color:var(--danger-color);">Error loading files: ${err.message}</td></tr>`;
+    }
+}
+
+function formatBytes(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+// 2. Setup file drop listeners
+function setupSyllabusDropZone() {
+    const dropZone = document.getElementById("syllabusDropZone");
+    const fileInput = document.getElementById("syllabusFileInput");
+    if (!dropZone || !fileInput) return;
+    
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, e => e.preventDefault(), false);
+        document.body.addEventListener(eventName, e => e.preventDefault(), false);
+    });
+    
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => {
+            dropZone.classList.add('dragover');
+        }, false);
+    });
+    
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => {
+            dropZone.classList.remove('dragover');
+        }, false);
+    });
+    
+    dropZone.addEventListener('drop', e => {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        if (files.length > 0) {
+            handleSyllabusFileSelection(files[0]);
+        }
+    });
+    
+    fileInput.onchange = () => {
+        if (fileInput.files.length > 0) {
+            handleSyllabusFileSelection(fileInput.files[0]);
+        }
+    };
+}
+
+function handleSyllabusFileSelection(file) {
+    const allowedExtensions = ['pdf', 'docx', 'txt', 'md'];
+    const extension = file.name.split('.').pop().toLowerCase();
+    
+    if (!allowedExtensions.includes(extension)) {
+        alert("Unsupported file type! Please upload a PDF, DOCX, TXT, or MD syllabus.");
+        return;
+    }
+    
+    if (file.size > 5 * 1024 * 1024) {
+        alert("File size exceeds 5MB limit. Please upload a smaller file.");
+        return;
+    }
+    
+    currentUploadFile = file;
+    // Visually show selected file inside drop zone
+    const dropZone = document.getElementById("syllabusDropZone");
+    if (dropZone) {
+        dropZone.innerHTML = `
+            <i data-lucide="file-check" style="width: 36px; height: 36px; color: var(--accent-mint);"></i>
+            <p style="margin: 10px 0 4px 0; font-weight: 600; font-size: 0.95rem; color: var(--accent-mint);">${file.name}</p>
+            <p style="margin: 0; font-size: 0.8rem; color: var(--text-secondary);">${formatBytes(file.size)}</p>
+            <button class="btn-primary" onclick="resetSelectedSyllabusFile(event)" style="margin-top: 12px; font-size: 0.8rem; padding: 6px 16px; border-radius: 20px; background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.3); color:#f87171;">Remove File</button>
+        `;
+        if (window.lucide) window.lucide.createIcons();
+    }
+}
+
+function resetSelectedSyllabusFile(event) {
+    if (event) {
+        event.stopPropagation();
+        event.preventDefault();
+    }
+    currentUploadFile = null;
+    const dropZone = document.getElementById("syllabusDropZone");
+    if (dropZone) {
+        dropZone.innerHTML = `
+            <i data-lucide="upload-cloud" style="width: 36px; height: 36px; color: var(--accent-indigo);"></i>
+            <p style="margin: 10px 0 4px 0; font-weight: 600; font-size: 0.95rem;">Drag & drop your syllabus here</p>
+            <p style="margin: 0; font-size: 0.8rem; color: var(--text-secondary);">Supports PDF, DOCX, TXT, or MD (Max 5MB)</p>
+            <input type="file" id="syllabusFileInput" accept=".pdf,.docx,.txt,.md" style="display: none;">
+            <button class="btn-primary" onclick="document.getElementById('syllabusFileInput').click()" style="margin-top: 12px; font-size: 0.8rem; padding: 6px 16px; border-radius: 20px;">Browse Files</button>
+        `;
+        if (window.lucide) window.lucide.createIcons();
+        setupSyllabusDropZone();
+    }
+}
+window.resetSelectedSyllabusFile = resetSelectedSyllabusFile;
+
+// 3. Dynamic parsers loaders
+function loadPdfJs() {
+    return new Promise((resolve, reject) => {
+        if (window['pdfjs-dist/build/pdf']) {
+            resolve(window['pdfjs-dist/build/pdf']);
+            return;
+        }
+        const script = document.createElement('script');
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js';
+        script.onload = () => resolve(window['pdfjs-dist/build/pdf']);
+        script.onerror = () => reject(new Error("Failed to load PDF.js engine"));
+        document.head.appendChild(script);
+    });
+}
+
+function loadMammoth() {
+    return new Promise((resolve, reject) => {
+        if (window.mammoth) {
+            resolve(window.mammoth);
+            return;
+        }
+        const script = document.createElement('script');
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js';
+        script.onload = () => resolve(window.mammoth);
+        script.onerror = () => reject(new Error("Failed to load Mammoth docx parsing engine"));
+        document.head.appendChild(script);
+    });
+}
+
+async function extractTextFromPdf(file) {
+    const pdfjsLib = await loadPdfJs();
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+    
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    let fullText = "";
+    
+    const maxPages = Math.min(pdf.numPages, 15);
+    for (let i = 1; i <= maxPages; i++) {
+        const page = await pdf.getPage(i);
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items.map(item => item.str).join(" ");
+        fullText += pageText + "\n";
+    }
+    return fullText;
+}
+
+async function extractTextFromDocx(file) {
+    const mammoth = await loadMammoth();
+    const arrayBuffer = await file.arrayBuffer();
+    const result = await mammoth.extractRawText({ arrayBuffer: arrayBuffer });
+    return result.value;
+}
+
+function extractTextFromTextFile(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target.result);
+        reader.onerror = (err) => reject(err);
+        reader.readAsText(file);
+    });
+}
+
+function readFileAsDataURL(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target.result);
+        reader.onerror = (err) => reject(err);
+        reader.readAsDataURL(file);
+    });
+}
+
+// 4. Submit form logic
+async function submitSyllabusForm() {
+    const textPaste = document.getElementById("syllabusTextPaste").value.trim();
+    
+    if (!currentUploadFile && !textPaste) {
+        alert("Please upload a file or paste syllabus text!");
+        return;
+    }
+    
+    const uploadForm = document.getElementById("syllabusUploadForm");
+    const loader = document.getElementById("syllabusLoadingStep");
+    
+    uploadForm.style.display = "none";
+    loader.style.display = "block";
+    
+    try {
+        let fileName = "PastedSyllabus.txt";
+        let fileType = "text/plain";
+        let fileSize = textPaste.length;
+        let fileData = "data:text/plain;base64," + btoa(unescape(encodeURIComponent(textPaste)));
+        let text = textPaste;
+        
+        if (currentUploadFile) {
+            fileName = currentUploadFile.name;
+            fileType = currentUploadFile.type || "application/octet-stream";
+            fileSize = currentUploadFile.size;
+            
+            // Read binary to base64 data URL
+            fileData = await readFileAsDataURL(currentUploadFile);
+            
+            const extension = fileName.split('.').pop().toLowerCase();
+            document.getElementById("syllabusLoadingTitle").innerText = `Analyzing ${fileName}...`;
+            
+            if (extension === 'pdf') {
+                text = await extractTextFromPdf(currentUploadFile);
+            } else if (extension === 'docx') {
+                text = await extractTextFromDocx(currentUploadFile);
+            } else {
+                text = await extractTextFromTextFile(currentUploadFile);
+            }
+        }
+        
+        // Post payload to backend
+        const res = await fetch('/api/syllabi', {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({
+                fileName,
+                fileType,
+                fileSize,
+                fileData,
+                extractedText: text
+            })
+        });
+        
+        if (!res.ok) {
+            const errData = await res.json();
+            throw new Error(errData.error || `Server status ${res.status}`);
+        }
+        
+        const data = await res.json();
+        parsedSyllabusTopics = data.parsed ? (data.parsed.topics || []) : [];
+        
+        // Display parsed results
+        document.getElementById("parsedCourseName").innerText = data.parsed ? (data.parsed.course_name || "General Course Syllabus") : "General Course Syllabus";
+        document.getElementById("parsedStudyWeeks").innerText = data.parsed ? (data.parsed.estimated_study_weeks || 12) : 12;
+        
+        renderSyllabusPreview(parsedSyllabusTopics);
+        
+        loader.style.display = "none";
+        document.getElementById("syllabusPreviewStep").style.display = "flex";
+        
+    } catch (err) {
+        alert("Failed to process syllabus: " + err.message);
+        loader.style.display = "none";
+        uploadForm.style.display = "flex";
+    }
+}
+window.submitSyllabusForm = submitSyllabusForm;
+
+function renderSyllabusPreview(topics) {
+    const container = document.getElementById("syllabusChecklistContainer");
+    const countTag = document.getElementById("parsedCountTag");
+    if (!container) return;
+    
+    container.innerHTML = "";
+    if (countTag) {
+        countTag.innerText = `${topics.length} Topic${topics.length === 1 ? '' : 's'}`;
+    }
+    
+    const courseName = document.getElementById("parsedCourseName").innerText;
+    
+    topics.forEach((topic, index) => {
+        const row = document.createElement("div");
+        row.className = "syllabus-topic-row";
+        
+        const leftArea = document.createElement("div");
+        leftArea.style.cssText = "display: flex; align-items: flex-start; gap: 10px; flex: 1; text-align: left;";
+        
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.className = "syllabus-topic-checkbox";
+        checkbox.style.cursor = "pointer";
+        checkbox.style.marginTop = "4px";
+        checkbox.dataset.index = index;
+        checkbox.checked = true;
+        
+        const textContent = document.createElement("div");
+        textContent.style.cssText = "display: flex; flex-direction: column; gap: 2px;";
+        
+        const titleInput = document.createElement("input");
+        titleInput.type = "text";
+        titleInput.className = "syllabus-topic-input";
+        titleInput.value = topic.title;
+        titleInput.style.fontWeight = "700";
+        titleInput.onchange = (e) => {
+            parsedSyllabusTopics[index].title = e.target.value;
+        };
+        
+        const descP = document.createElement("p");
+        descP.style.cssText = "margin: 0; font-size: 0.78rem; color: var(--text-secondary); line-height: 1.3;";
+        descP.innerText = topic.description || "Review and master this study chapter.";
+        
+        const categorySpan = document.createElement("span");
+        categorySpan.style.cssText = "font-size: 0.72rem; color: var(--accent-indigo); font-weight: 700; margin-top: 2px;";
+        categorySpan.innerText = `📂 ${topic.category || courseName}`;
+        
+        textContent.appendChild(titleInput);
+        textContent.appendChild(descP);
+        textContent.appendChild(categorySpan);
+        
+        leftArea.appendChild(checkbox);
+        leftArea.appendChild(textContent);
+        
+        // Right area: Difficulty Badge
+        const rightArea = document.createElement("div");
+        const diff = (topic.difficulty || "Medium").toLowerCase();
+        let badgeClass = "badge-medium";
+        if (diff === 'easy') badgeClass = "badge-easy";
+        else if (diff === 'hard') badgeClass = "badge-hard";
+        
+        rightArea.innerHTML = `<span class="difficulty-badge ${badgeClass}">${topic.difficulty || 'Medium'}</span>`;
+        
+        row.appendChild(leftArea);
+        row.appendChild(rightArea);
+        container.appendChild(row);
+    });
+}
+
+function selectAllSyllabus(checked) {
+    const checkboxes = document.querySelectorAll(".syllabus-topic-checkbox");
+    checkboxes.forEach(c => c.checked = checked);
+}
+window.selectAllSyllabus = selectAllSyllabus;
+
+function importSelectedSyllabusTopics() {
+    const checkboxes = document.querySelectorAll(".syllabus-topic-checkbox");
+    const courseName = document.getElementById("parsedCourseName").innerText;
+    let importCount = 0;
+    
+    checkboxes.forEach(c => {
+        if (c.checked) {
+            const index = parseInt(c.dataset.index);
+            const topic = parsedSyllabusTopics[index];
+            if (topic && topic.title) {
+                if (typeof window.addNewTopic === 'function') {
+                    // Map: subject = category, topic = title, grade = courseName, tag = difficulty
+                    window.addNewTopic(topic.category || courseName, topic.title, courseName, topic.difficulty || "Medium");
+                    importCount++;
+                }
+            }
+        }
+    });
+    
+    if (importCount > 0) {
+        if (typeof renderTagFilters === 'function') {
+            renderTagFilters();
+        }
+        alert(`Imported ${importCount} topics directly into your spaced repetition scheduler!`);
+        closeSyllabusManager();
+    } else {
+        alert("Please check at least one topic to import.");
+    }
+}
+window.importSelectedSyllabusTopics = importSelectedSyllabusTopics;
+
+// 5. Download syllabus file
+async function downloadSyllabus(id) {
+    try {
+        const res = await fetch(`/api/syllabi/${id}`, {
+            headers: getAuthHeaders()
+        });
+        if (!res.ok) throw new Error("Failed to load file from storage.");
+        const file = await res.json();
+        
+        const downloadLink = document.createElement("a");
+        downloadLink.href = file.fileData;
+        downloadLink.download = file.fileName;
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        document.body.removeChild(downloadLink);
+    } catch (err) {
+        alert("Download failed: " + err.message);
+    }
+}
+window.downloadSyllabus = downloadSyllabus;
+
+// 6. Delete syllabus file
+async function deleteSyllabus(id) {
+    if (!confirm("Are you sure you want to delete this syllabus from your history?")) return;
+    
+    try {
+        const res = await fetch(`/api/syllabi/${id}`, {
+            method: 'DELETE',
+            headers: getAuthHeaders()
+        });
+        
+        if (!res.ok) throw new Error("Failed to delete record.");
+        alert("Syllabus deleted successfully.");
+        fetchSyllabusHistory();
+    } catch (err) {
+        alert("Deletion failed: " + err.message);
+    }
+}
+window.deleteSyllabus = deleteSyllabus;
