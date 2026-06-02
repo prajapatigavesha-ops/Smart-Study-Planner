@@ -87,17 +87,82 @@ function switchView(viewName) {
 }
 window.switchView = switchView;
 
+// Helper to decode username from JWT token
+function getUsernameFromToken() {
+    const t = localStorage.getItem('token');
+    if (!t) return 'Guest';
+    try {
+        const base64Url = t.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(window.atob(base64).split('').map(function(c) {
+            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        }).join(''));
+        return JSON.parse(jsonPayload).username || 'John Doe';
+    } catch (e) {
+        return 'John Doe';
+    }
+}
+
+// Toggle profile dropdown card
+function toggleProfileDropdown(event) {
+    if (event) event.stopPropagation();
+    const dropdown = document.getElementById('profileDropdown');
+    if (dropdown) {
+        dropdown.classList.toggle('active');
+    }
+}
+window.toggleProfileDropdown = toggleProfileDropdown;
+
+// Close profile dropdown when clicking outside
+document.addEventListener('click', (e) => {
+    const dropdown = document.getElementById('profileDropdown');
+    const btn = document.querySelector('.profile-avatar-btn');
+    if (dropdown && dropdown.classList.contains('active')) {
+        if (!dropdown.contains(e.target) && (!btn || !btn.contains(e.target))) {
+            dropdown.classList.remove('active');
+        }
+    }
+});
+
 // --- Auth navbar and local banner setup ---
 function setupAuthNavbar() {
     if (isAuthenticated) {
         if (localBanner) localBanner.style.display = 'none';
         
-        // Show Logout and Dashboard button instead of Login/Signup
+        const username = getUsernameFromToken();
+        const initials = username.substring(0, 2).toUpperCase();
+        
+        // Show Profile and Dashboard button instead of Login/Signup
         if (navAuthLinks) {
             navAuthLinks.innerHTML = `
                 <button onclick="switchView('home')" id="homeNavBtn" style="padding: 8px 16px; cursor: pointer; background:transparent; border:none; color: var(--text-secondary); font-size: 0.85rem; font-family: var(--font-body); font-weight: 600; margin-right: 5px;">Home</button>
                 <a href="dashboard.html" style="text-decoration: none; margin-right: 10px;"><button class="liquid-glass rounded-full px-6 py-2.5 text-sm text-foreground hover:scale-[1.03]" style="cursor:pointer; border-radius: 50px; font-family: var(--font-body); font-weight: 600;">Dashboard</button></a>
-                <button onclick="logout()" id="logoutBtn" style="background:transparent; color:var(--danger-color); border:1px solid var(--danger-color); padding: 8px 16px; cursor:pointer; border-radius:50px; font-family: var(--font-body); font-weight: 600; font-size: 0.85rem;">Log Out</button>
+                
+                <div class="profile-container">
+                    <button onclick="toggleProfileDropdown(event)" class="profile-avatar-btn">
+                        <div class="profile-avatar-img">${initials}</div>
+                        <span>Profile</span>
+                    </button>
+                    <div id="profileDropdown" class="profile-dropdown-card">
+                        <div class="profile-dropdown-header">
+                            <p class="profile-dropdown-name">John Doe</p>
+                            <p class="profile-dropdown-username">@${username}</p>
+                        </div>
+                        <div class="profile-dropdown-info">
+                            <div class="profile-dropdown-info-item">
+                                <span class="profile-dropdown-info-label">Degree/Major</span>
+                                <span class="profile-dropdown-info-val">Computer Science</span>
+                            </div>
+                            <div class="profile-dropdown-info-item">
+                                <span class="profile-dropdown-info-label">Institution</span>
+                                <span class="profile-dropdown-info-val">University of Tech</span>
+                            </div>
+                        </div>
+                        <div class="profile-dropdown-actions">
+                            <button onclick="logout()" id="logoutBtn" style="background:transparent; color:var(--danger-color); border:1px solid var(--danger-color); padding: 8px 16px; cursor:pointer; border-radius:50px; font-family: var(--font-body); font-weight: 600; font-size: 0.85rem; width: 100%;">Log Out</button>
+                        </div>
+                    </div>
+                </div>
             `;
         }
     } else {

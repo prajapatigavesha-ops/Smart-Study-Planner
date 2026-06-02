@@ -17,16 +17,78 @@ function logout() {
     window.location.href = 'index.html';
 }
 
-// Ensure there is a logout button injected into the nav
+// Helper to decode username from JWT token
+function getUsernameFromToken() {
+    const t = localStorage.getItem('token');
+    if (!t) return 'Guest';
+    try {
+        const base64Url = t.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(window.atob(base64).split('').map(function(c) {
+            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        }).join(''));
+        return JSON.parse(jsonPayload).username || 'John Doe';
+    } catch (e) {
+        return 'John Doe';
+    }
+}
+
+// Toggle profile dropdown card
+function toggleProfileDropdown(event) {
+    if (event) event.stopPropagation();
+    const dropdown = document.getElementById('profileDropdown');
+    if (dropdown) {
+        dropdown.classList.toggle('active');
+    }
+}
+window.toggleProfileDropdown = toggleProfileDropdown;
+
+// Close profile dropdown when clicking outside
+document.addEventListener('click', (e) => {
+    const dropdown = document.getElementById('profileDropdown');
+    const btn = document.querySelector('.profile-avatar-btn');
+    if (dropdown && dropdown.classList.contains('active')) {
+        if (!dropdown.contains(e.target) && (!btn || !btn.contains(e.target))) {
+            dropdown.classList.remove('active');
+        }
+    }
+});
+
+// Ensure there is a profile dropdown injected into the nav
 document.addEventListener("DOMContentLoaded", () => {
     const navDiv = document.getElementById('navButtons') || document.querySelector('nav div');
-    if (navDiv && !document.getElementById('logoutBtn')) {
-        const logoutBtn = document.createElement('button');
-        logoutBtn.id = 'logoutBtn';
-        logoutBtn.innerText = 'Log Out';
-        logoutBtn.style.cssText = "background:transparent; color:var(--danger-color); border:1px solid var(--danger-color); padding: 8px 16px; cursor:pointer; border-radius:50px; font-family: var(--font-body); font-weight: 600; font-size: 0.85rem; margin-left: 5px;";
-        logoutBtn.onclick = logout;
-        navDiv.appendChild(logoutBtn);
+    if (navDiv && !document.getElementById('profileDropdown')) {
+        const username = getUsernameFromToken();
+        const initials = username.substring(0, 2).toUpperCase();
+        
+        const profileContainer = document.createElement('div');
+        profileContainer.className = 'profile-container';
+        profileContainer.innerHTML = `
+            <button onclick="toggleProfileDropdown(event)" class="profile-avatar-btn">
+                <div class="profile-avatar-img">${initials}</div>
+                <span>Profile</span>
+            </button>
+            <div id="profileDropdown" class="profile-dropdown-card">
+                <div class="profile-dropdown-header">
+                    <p class="profile-dropdown-name">John Doe</p>
+                    <p class="profile-dropdown-username">@${username}</p>
+                </div>
+                <div class="profile-dropdown-info">
+                    <div class="profile-dropdown-info-item">
+                        <span class="profile-dropdown-info-label">Degree/Major</span>
+                        <span class="profile-dropdown-info-val">Computer Science</span>
+                    </div>
+                    <div class="profile-dropdown-info-item">
+                        <span class="profile-dropdown-info-label">Institution</span>
+                        <span class="profile-dropdown-info-val">University of Tech</span>
+                    </div>
+                </div>
+                <div class="profile-dropdown-actions">
+                    <button onclick="logout()" id="logoutBtn" style="background:transparent; color:var(--danger-color); border:1px solid var(--danger-color); padding: 8px 16px; cursor:pointer; border-radius:50px; font-family: var(--font-body); font-weight: 600; font-size: 0.85rem; width: 100%;">Log Out</button>
+                </div>
+            </div>
+        `;
+        navDiv.appendChild(profileContainer);
     }
     checkStreak();
     fetchTasks();
