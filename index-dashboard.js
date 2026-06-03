@@ -124,13 +124,77 @@ document.addEventListener('click', (e) => {
     }
 });
 
+// Toggle profile editing mode
+function toggleProfileEdit(editState) {
+    const viewMode = document.getElementById('profileViewMode');
+    const editMode = document.getElementById('profileEditMode');
+    if (viewMode && editMode) {
+        if (editState) {
+            const username = getUsernameFromToken();
+            const prefix = username + '_';
+            document.getElementById('editProfileName').value = localStorage.getItem(prefix + 'profile_name') || username;
+            document.getElementById('editProfileEducation').value = localStorage.getItem(prefix + 'profile_education') || '';
+            document.getElementById('editProfileInterests').value = localStorage.getItem(prefix + 'profile_interests') || '';
+            
+            viewMode.style.display = 'none';
+            editMode.style.display = 'block';
+        } else {
+            viewMode.style.display = 'block';
+            editMode.style.display = 'none';
+        }
+    }
+}
+window.toggleProfileEdit = toggleProfileEdit;
+
+// Save profile data to localStorage
+function saveProfileData() {
+    const nameVal = document.getElementById('editProfileName').value.trim();
+    const eduVal = document.getElementById('editProfileEducation').value.trim();
+    const intVal = document.getElementById('editProfileInterests').value.trim();
+    
+    const username = getUsernameFromToken();
+    const prefix = username + '_';
+    
+    localStorage.setItem(prefix + 'profile_name', nameVal);
+    localStorage.setItem(prefix + 'profile_education', eduVal);
+    localStorage.setItem(prefix + 'profile_interests', intVal);
+    
+    const nameDisp = document.getElementById('profileNameDisplay');
+    const eduDisp = document.getElementById('profileEducationDisplay');
+    const intDisp = document.getElementById('profileInterestsDisplay');
+    
+    const finalName = nameVal || username;
+    
+    if (nameDisp) nameDisp.innerText = finalName;
+    if (eduDisp) eduDisp.innerHTML = eduVal || '<span style="color:rgba(255,255,255,0.3); font-style:italic;">Not set</span>';
+    if (intDisp) intDisp.innerHTML = intVal || '<span style="color:rgba(255,255,255,0.3); font-style:italic;">Not set</span>';
+    
+    const initialsImg = document.querySelector('.profile-avatar-img');
+    if (initialsImg) {
+        initialsImg.innerText = finalName.substring(0, 2).toUpperCase();
+    }
+    
+    toggleProfileEdit(false);
+}
+window.saveProfileData = saveProfileData;
+
 // --- Auth navbar and local banner setup ---
 function setupAuthNavbar() {
     if (isAuthenticated) {
         if (localBanner) localBanner.style.display = 'none';
         
         const username = getUsernameFromToken();
-        const initials = username.substring(0, 2).toUpperCase();
+        const prefix = username + '_';
+        
+        const storedName = localStorage.getItem(prefix + 'profile_name');
+        const storedEducation = localStorage.getItem(prefix + 'profile_education');
+        const storedInterests = localStorage.getItem(prefix + 'profile_interests');
+        
+        const profileName = storedName !== null && storedName !== "" ? storedName : username;
+        const profileEducation = storedEducation !== null ? storedEducation : '';
+        const profileInterests = storedInterests !== null ? storedInterests : '';
+        
+        const initials = profileName.substring(0, 2).toUpperCase();
         
         // Show Profile and Dashboard button instead of Login/Signup
         if (navAuthLinks) {
@@ -144,22 +208,51 @@ function setupAuthNavbar() {
                         <span>Profile</span>
                     </button>
                     <div id="profileDropdown" class="profile-dropdown-card">
-                        <div class="profile-dropdown-header">
-                            <p class="profile-dropdown-name">John Doe</p>
-                            <p class="profile-dropdown-username">@${username}</p>
-                        </div>
-                        <div class="profile-dropdown-info">
-                            <div class="profile-dropdown-info-item">
-                                <span class="profile-dropdown-info-label">Degree/Major</span>
-                                <span class="profile-dropdown-info-val">Computer Science</span>
+                        <!-- View Mode -->
+                        <div id="profileViewMode">
+                            <div class="profile-dropdown-header">
+                                <p class="profile-dropdown-name" id="profileNameDisplay">${profileName}</p>
+                                <p class="profile-dropdown-username">@${username}</p>
                             </div>
-                            <div class="profile-dropdown-info-item">
-                                <span class="profile-dropdown-info-label">Institution</span>
-                                <span class="profile-dropdown-info-val">University of Tech</span>
+                            <div class="profile-dropdown-info">
+                                <div class="profile-dropdown-info-item">
+                                    <span class="profile-dropdown-info-label">Degree/Major</span>
+                                    <span class="profile-dropdown-info-val" id="profileEducationDisplay">${profileEducation || '<span style="color:rgba(255,255,255,0.3); font-style:italic;">Not set</span>'}</span>
+                                </div>
+                                <div class="profile-dropdown-info-item">
+                                    <span class="profile-dropdown-info-label">Institution</span>
+                                    <span class="profile-dropdown-info-val" id="profileInterestsDisplay">${profileInterests || '<span style="color:rgba(255,255,255,0.3); font-style:italic;">Not set</span>'}</span>
+                                </div>
+                            </div>
+                            <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 12px;">
+                                <button onclick="toggleProfileEdit(true)" style="width: 100%; padding: 8px; font-size: 0.8rem; border-radius: 20px; font-weight: 600; cursor: pointer; background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); color: var(--text-primary); transition: all 0.3s ease;">✏️ Edit Profile</button>
+                                <button onclick="logout()" id="logoutBtn" style="background:transparent; color:var(--danger-color); border:1px solid var(--danger-color); padding: 8px 16px; cursor:pointer; border-radius:50px; font-family: var(--font-body); font-weight: 600; font-size: 0.85rem; width: 100%;">Log Out</button>
                             </div>
                         </div>
-                        <div class="profile-dropdown-actions">
-                            <button onclick="logout()" id="logoutBtn" style="background:transparent; color:var(--danger-color); border:1px solid var(--danger-color); padding: 8px 16px; cursor:pointer; border-radius:50px; font-family: var(--font-body); font-weight: 600; font-size: 0.85rem; width: 100%;">Log Out</button>
+                        
+                        <!-- Edit Mode -->
+                        <div id="profileEditMode" style="display: none;">
+                            <div class="profile-dropdown-header">
+                                <h4 style="margin: 0; font-size: 1.1rem; color: var(--text-primary); font-family: var(--font-body); font-weight: 700;">Edit Profile</h4>
+                            </div>
+                            <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; margin-top: 10px;">
+                                <div style="display: flex; flex-direction: column; gap: 4px; text-align: left;">
+                                    <label style="font-size: 0.72rem; text-transform: uppercase; font-weight: 800; color: var(--accent-indigo); letter-spacing: 0.05em;">Full Name</label>
+                                    <input type="text" id="editProfileName" value="${profileName}">
+                                </div>
+                                <div style="display: flex; flex-direction: column; gap: 4px; text-align: left;">
+                                    <label style="font-size: 0.72rem; text-transform: uppercase; font-weight: 800; color: var(--accent-indigo); letter-spacing: 0.05em;">Degree/Major</label>
+                                    <input type="text" id="editProfileEducation" value="${profileEducation}">
+                                </div>
+                                <div style="display: flex; flex-direction: column; gap: 4px; text-align: left;">
+                                    <label style="font-size: 0.72rem; text-transform: uppercase; font-weight: 800; color: var(--accent-indigo); letter-spacing: 0.05em;">Institution</label>
+                                    <input type="text" id="editProfileInterests" value="${profileInterests}">
+                                </div>
+                            </div>
+                            <div style="display: flex; gap: 8px; justify-content: flex-end; border-top: 1px solid var(--glass-border); padding-top: 12px;">
+                                <button onclick="toggleProfileEdit(false)" style="padding: 8px 16px; font-size: 0.8rem; border-radius: 20px; font-weight: 600; cursor: pointer; background: transparent; border: 1px solid var(--glass-border); color: var(--text-secondary); transition: all 0.3s ease;">Cancel</button>
+                                <button onclick="saveProfileData()" class="btn-primary" style="padding: 8px 16px; font-size: 0.8rem; border-radius: 20px; font-weight: 600; cursor: pointer; transition: all 0.3s ease;">Save</button>
+                            </div>
                         </div>
                     </div>
                 </div>
