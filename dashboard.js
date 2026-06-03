@@ -287,7 +287,7 @@ async function saveStats() {
     } catch(err) { console.error(err); }
 }
 
-const timelineSlots = ["08:00", "10:00", "12:00", "14:00", "16:00", "18:00", "20:00"];
+const timelineSlots = ["8:00 AM", "10:00 AM", "12:00 PM", "2:00 PM", "4:00 PM", "6:00 PM", "8:00 PM"];
 const taskSlotsMap = JSON.parse(localStorage.getItem('taskSlots') || '{}');
 
 function renderTasks() {
