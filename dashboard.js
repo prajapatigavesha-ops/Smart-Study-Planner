@@ -940,9 +940,7 @@ function handleSRAddTopic(e) {
     topicInput.value = "";
     gradeInput.value = "";
     if (tagInput) tagInput.value = "";
-}
-
-// --- Tag Filtering System for Authenticated Dashboard ---
+}// --- Tag Filtering System for Authenticated Dashboard ---
 let activeFilter = 'All';
 
 function renderTagFilters() {
@@ -977,18 +975,92 @@ function renderTagFilters() {
     tagsArray.forEach(tag => {
         const pill = document.createElement("button");
         pill.className = `filter-pill ${tag === activeFilter ? 'active' : ''}`;
-        pill.innerText = tag;
-        pill.onclick = () => {
-            activeFilter = tag;
-            renderTagFilters();
-            renderTasks();
-            renderSpacedRepetition();
-        };
+        pill.style.display = "inline-flex";
+        pill.style.alignItems = "center";
+        
+        if (tag === 'All') {
+            pill.innerText = tag;
+            pill.onclick = () => {
+                activeFilter = tag;
+                renderTagFilters();
+                renderTasks();
+                renderSpacedRepetition();
+            };
+        } else {
+            pill.innerHTML = `
+                <span>${tag}</span>
+                <span class="delete-tag-btn" onclick="deleteTagCategory('${tag}', event)" title="Delete entire category">&times;</span>
+            `;
+            pill.onclick = () => {
+                activeFilter = tag;
+                renderTagFilters();
+                renderTasks();
+                renderSpacedRepetition();
+            };
+        }
         bar.appendChild(pill);
     });
     
     container.appendChild(bar);
 }
+
+async function deleteTagCategory(tag, event) {
+    if (event) event.stopPropagation();
+    if (!confirm(`Are you sure you want to delete the topic "${tag}" and all its tasks/reviews?`)) {
+        return;
+    }
+    
+    // 1. Delete tasks with this tag
+    const tasksToDelete = tasks.filter(t => t.tag === tag);
+    for (const task of tasksToDelete) {
+        // Delete from local array
+        const index = tasks.findIndex(t => t.id === task.id);
+        if (index !== -1) tasks.splice(index, 1);
+        
+        // Remove slot mapping
+        if (typeof taskSlotsMap !== 'undefined') {
+            delete taskSlotsMap[task.id];
+        }
+        
+        // Delete from server
+        try {
+            await fetch(`/api/tasks/${task.id}`, {
+                method: 'DELETE',
+                headers: getAuthHeaders()
+            });
+        } catch (err) {
+            console.error(err);
+        }
+    }
+    if (typeof taskSlotsMap !== 'undefined') {
+        localStorage.setItem('taskSlots', JSON.stringify(taskSlotsMap));
+    }
+    
+    // 2. Delete study topics with this tag or subject
+    if (window.studyTopics) {
+        window.studyTopics = window.studyTopics.filter(t => t.tag !== tag && t.subject !== tag);
+        localStorage.setItem('studyTopics', JSON.stringify(window.studyTopics));
+    }
+    
+    // 3. Clear reviews from calendarStore
+    if (window.calendarStore) {
+        const remainingTopics = window.studyTopics || [];
+        const remainingTopicIds = new Set(remainingTopics.map(t => t.id));
+        window.calendarStore = window.calendarStore.filter(evt => remainingTopicIds.has(evt.topicId));
+        localStorage.setItem('calendarStore', JSON.stringify(window.calendarStore));
+    }
+    
+    // 4. Reset active filter if deleted
+    if (activeFilter === tag) {
+        activeFilter = 'All';
+    }
+    
+    // 5. Re-render
+    renderTagFilters();
+    renderTasks();
+    renderSpacedRepetition();
+}
+window.deleteTagCategory = deleteTagCategory;
 
 window.handleSRAddTopic = handleSRAddTopic;
 window.renderSpacedRepetition = renderSpacedRepetition;

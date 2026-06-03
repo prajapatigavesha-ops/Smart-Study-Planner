@@ -545,17 +545,63 @@ function renderTagFilters() {
     tagsArray.forEach(tag => {
         const pill = document.createElement("button");
         pill.className = `filter-pill ${tag === activeFilter ? 'active' : ''}`;
-        pill.innerText = tag;
-        pill.onclick = () => {
-            activeFilter = tag;
-            renderTagFilters();
-            renderSpacedRepetition();
-        };
+        pill.style.display = "inline-flex";
+        pill.style.alignItems = "center";
+        
+        if (tag === 'All') {
+            pill.innerText = tag;
+            pill.onclick = () => {
+                activeFilter = tag;
+                renderTagFilters();
+                renderSpacedRepetition();
+            };
+        } else {
+            pill.innerHTML = `
+                <span>${tag}</span>
+                <span class="delete-tag-btn" onclick="deleteTagCategory('${tag}', event)" title="Delete entire category">&times;</span>
+            `;
+            pill.onclick = () => {
+                activeFilter = tag;
+                renderTagFilters();
+                renderSpacedRepetition();
+            };
+        }
         bar.appendChild(pill);
     });
     
     container.appendChild(bar);
 }
+
+async function deleteTagCategory(tag, event) {
+    if (event) event.stopPropagation();
+    if (!confirm(`Are you sure you want to delete the topic "${tag}" and all its scheduled reviews?`)) {
+        return;
+    }
+    
+    // 1. Delete study topics with this tag or subject
+    if (window.studyTopics) {
+        window.studyTopics = window.studyTopics.filter(t => t.tag !== tag && t.subject !== tag);
+        localStorage.setItem('studyTopics', JSON.stringify(window.studyTopics));
+    }
+    
+    // 2. Clear reviews from calendarStore
+    if (window.calendarStore) {
+        const remainingTopics = window.studyTopics || [];
+        const remainingTopicIds = new Set(remainingTopics.map(t => t.id));
+        window.calendarStore = window.calendarStore.filter(evt => remainingTopicIds.has(evt.topicId));
+        localStorage.setItem('calendarStore', JSON.stringify(window.calendarStore));
+    }
+    
+    // 3. Reset active filter if deleted
+    if (activeFilter === tag) {
+        activeFilter = 'All';
+    }
+    
+    // 4. Re-render
+    renderTagFilters();
+    renderSpacedRepetition();
+}
+window.deleteTagCategory = deleteTagCategory;
 
 // --- Spaced Repetition Simulator Rendering ---
 function renderSpacedRepetition() {

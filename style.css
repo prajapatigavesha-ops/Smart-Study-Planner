@@ -2069,6 +2069,37 @@ html.dark .tag-badge {
   box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35);
 }
 
+/* Tag delete button */
+.delete-tag-btn {
+  margin-left: 8px;
+  font-size: 1.15rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--text-secondary);
+  opacity: 0.5;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+}
+
+.delete-tag-btn:hover {
+  opacity: 1;
+  color: var(--danger-color) !important;
+  transform: scale(1.2);
+}
+
+.filter-pill.active .delete-tag-btn {
+  color: #ffffff;
+  opacity: 0.7;
+}
+
+.filter-pill.active .delete-tag-btn:hover {
+  color: #ff8a8a !important;
+  opacity: 1;
+}
+
 /* Confetti particles */
 .confetti-particle {
   position: fixed;
