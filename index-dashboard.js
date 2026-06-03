@@ -205,7 +205,6 @@ function setupAuthNavbar() {
                 <div class="profile-container">
                     <button onclick="toggleProfileDropdown(event)" class="profile-avatar-btn">
                         <div class="profile-avatar-img">${initials}</div>
-                        <span>Profile</span>
                     </button>
                     <div id="profileDropdown" class="profile-dropdown-card">
                         <!-- View Mode -->
