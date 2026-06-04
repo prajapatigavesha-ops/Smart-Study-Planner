@@ -502,9 +502,11 @@ function startTimer() {
     timeLeft--;
     if (mode === 'study') {
       totalStudyTime++;
+      incrementDailyStudySeconds(1);
       if (totalStudyTime % 60 === 0) {
           saveStats();
           updateTimerStats();
+          updateChart();
       }
     }
     updateDisplay();
@@ -634,41 +636,69 @@ function updateGoalProgressRing() {
 }
 
 /* --- GITHUB STYLE ACTIVITY STREAK HEATMAP --- */
+function incrementDailyStudySeconds(seconds) {
+  const username = getUsernameFromToken();
+  if (!username || username === 'Guest' || username === 'John Doe') return;
+  const prefix = username + '_';
+  const history = JSON.parse(localStorage.getItem(prefix + 'study_history') || '{}');
+  const todayStr = getLocalDateString(new Date());
+  history[todayStr] = (history[todayStr] || 0) + seconds;
+  localStorage.setItem(prefix + 'study_history', JSON.stringify(history));
+}
+
+function initializeStreakGrid(username) {
+  const prefix = username + '_';
+  let grid = localStorage.getItem(prefix + 'streakGrid');
+  if (!grid) {
+      const streakGrid = {};
+      const today = new Date();
+      // Initialize the past 34 days to 0 for a fresh start for new users
+      for (let i = 0; i < 34; i++) {
+          const d = new Date();
+          d.setDate(today.getDate() - (34 - i));
+          streakGrid[getLocalDateString(d)] = 0;
+      }
+      streakGrid[getLocalDateString(today)] = 0;
+      localStorage.setItem(prefix + 'streakGrid', JSON.stringify(streakGrid));
+  }
+}
+
 function generateHeatmap() {
   const matrix = document.getElementById("heatmapMatrix");
   if (!matrix) return;
   matrix.innerHTML = "";
   
-  // Seed with 34 days of past study levels (0 to 3), current day is index 35.
-  const pastLevels = [
-      0, 1, 2, 0, 3, 2, 1,
-      0, 0, 1, 2, 3, 0, 1,
-      2, 1, 0, 2, 3, 2, 1,
-      0, 1, 1, 2, 0, 3, 2,
-      1, 2, 0, 3, 3, 2
-  ];
+  const username = getUsernameFromToken();
+  const prefix = username + '_';
+  initializeStreakGrid(username);
   
-  // Today's streak intensity based on session count completed
-  let todayLevel = 0;
-  if (sessionsCompleted >= 3) todayLevel = 3;
-  else if (sessionsCompleted === 2) todayLevel = 2;
-  else if (sessionsCompleted === 1) todayLevel = 1;
+  const grid = JSON.parse(localStorage.getItem(prefix + 'streakGrid')) || {};
+  const today = new Date();
   
-  const levels = [...pastLevels, todayLevel];
+  // Sync today's sessionsCompleted with the grid
+  const todayStr = getLocalDateString(today);
+  grid[todayStr] = sessionsCompleted;
+  localStorage.setItem(prefix + 'streakGrid', JSON.stringify(grid));
+  
+  const levels = [];
+  const dates = [];
+  
+  for (let i = 0; i < 35; i++) {
+      const d = new Date();
+      d.setDate(today.getDate() - (34 - i));
+      const dStr = getLocalDateString(d);
+      const count = grid[dStr] || 0;
+      levels.push(Math.min(3, count));
+      dates.push({ dateStr: dStr, isToday: i === 34 });
+  }
   
   levels.forEach((level, idx) => {
       const cell = document.createElement("div");
-      const isToday = idx === levels.length - 1;
+      const dateInfo = dates[idx];
       
-      cell.className = `heatmap-cell streak-level-${level} ${isToday ? 'today-cell' : ''}`;
+      cell.className = `heatmap-cell streak-level-${level} ${dateInfo.isToday ? 'today-cell' : ''}`;
       
-      let dayLabel;
-      if (isToday) {
-          dayLabel = "Today";
-      } else {
-          dayLabel = `Day -${levels.length - 1 - idx}`;
-      }
-      
+      const dayLabel = dateInfo.isToday ? "Today" : `Day -${levels.length - 1 - idx}`;
       const mins = level === 3 ? "75+ mins" : level === 2 ? "50 mins" : level === 1 ? "25 mins" : "0 mins";
       cell.setAttribute("data-tooltip", `${dayLabel}: Study level ${level} (${mins})`);
       matrix.appendChild(cell);

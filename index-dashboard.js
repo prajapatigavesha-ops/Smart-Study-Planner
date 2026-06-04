@@ -436,24 +436,21 @@ function getLocalDateString(date) {
 
 // --- Initialize streak grid with seed values ---
 function initializeStreakGrid() {
-    let grid = localStorage.getItem('streakGrid');
+    const username = getUsernameFromToken();
+    if (!username || username === 'Guest' || username === 'John Doe') return;
+    const prefix = username + '_';
+    let grid = localStorage.getItem(prefix + 'streakGrid');
     if (!grid) {
         const streakGrid = {};
         const today = new Date();
-        const seedValues = [
-            0, 1, 2, 0, 3, 2, 1,
-            0, 0, 1, 2, 3, 0, 1,
-            2, 1, 0, 2, 3, 2, 1,
-            0, 1, 1, 2, 0, 3, 2,
-            1, 2, 0, 3, 3, 2
-        ];
+        // Initialize with 0s for past 34 days so that a new user starts fresh
         for (let i = 0; i < 34; i++) {
             const d = new Date();
             d.setDate(today.getDate() - (34 - i));
-            streakGrid[getLocalDateString(d)] = seedValues[i];
+            streakGrid[getLocalDateString(d)] = 0;
         }
         streakGrid[getLocalDateString(today)] = 0;
-        localStorage.setItem('streakGrid', JSON.stringify(streakGrid));
+        localStorage.setItem(prefix + 'streakGrid', JSON.stringify(streakGrid));
     }
 }
 
@@ -464,13 +461,16 @@ function generateStreakTracker(highlightToday = false) {
     matrix.innerHTML = "";
     
     initializeStreakGrid();
-    const grid = JSON.parse(localStorage.getItem('streakGrid')) || {};
+    
+    const username = getUsernameFromToken();
+    const prefix = username + '_';
+    const grid = JSON.parse(localStorage.getItem(prefix + 'streakGrid')) || {};
     const today = new Date();
     
     // Sync today's sessionsCompleted with the grid
     const todayStr = getLocalDateString(today);
     grid[todayStr] = sessionsCompleted;
-    localStorage.setItem('streakGrid', JSON.stringify(grid));
+    localStorage.setItem(prefix + 'streakGrid', JSON.stringify(grid));
     
     const levels = [];
     const dates = [];

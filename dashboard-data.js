@@ -1,16 +1,53 @@
 /**
  * Modular Mock Data File & State Controller representing a student's study metrics.
  */
+
+// Helper to get local YYYY-MM-DD date string
+function getLocalDateString(date) {
+    const offset = date.getTimezoneOffset();
+    const localDate = new Date(date.getTime() - (offset * 60 * 1000));
+    return localDate.toISOString().split('T')[0];
+}
+window.getLocalDateString = getLocalDateString;
+
+// Helper to decode username from JWT token
+function getUsernameFromToken() {
+    const t = localStorage.getItem('token');
+    if (!t) return 'Guest';
+    try {
+        const base64Url = t.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(window.atob(base64).split('').map(function(c) {
+            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        }).join(''));
+        return JSON.parse(jsonPayload).username || 'John Doe';
+    } catch (e) {
+        return 'John Doe';
+    }
+}
+window.getUsernameFromToken = getUsernameFromToken;
+
+// Helper to calculate current week's dates (Monday to Sunday)
+function getDatesForCurrentWeek() {
+    const today = new Date();
+    const currentDay = today.getDay(); // 0 is Sunday, 1 is Monday, etc.
+    const distanceToMonday = currentDay === 0 ? -6 : 1 - currentDay;
+    
+    const dates = [];
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    
+    for (let i = 0; i < 7; i++) {
+        const d = new Date();
+        d.setDate(today.getDate() + distanceToMonday + i);
+        dates.push({
+            dayLabel: days[i],
+            dateStr: getLocalDateString(d)
+        });
+    }
+    return dates;
+}
+
 const studentMetrics = {
-    weeklyStudyTrends: [
-        { day: 'Mon', focusMinutes: 120, targetMinutes: 150, breaks: 3 },
-        { day: 'Tue', focusMinutes: 180, targetMinutes: 150, breaks: 4 },
-        { day: 'Wed', focusMinutes: 90, targetMinutes: 150, breaks: 2 },
-        { day: 'Thu', focusMinutes: 210, targetMinutes: 150, breaks: 5 },
-        { day: 'Fri', focusMinutes: 150, targetMinutes: 150, breaks: 3 },
-        { day: 'Sat', focusMinutes: 240, targetMinutes: 180, breaks: 6 },
-        { day: 'Sun', focusMinutes: 180, targetMinutes: 180, breaks: 4 }
-    ],
     subjectMastery: [
         { subject: 'Math', mastery: 85 },
         { subject: 'History', mastery: 65 },
@@ -33,16 +70,25 @@ const studentMetricsController = {
     data: studentMetrics,
     
     getWeeklyLabels() {
-        return this.data.weeklyStudyTrends.map(t => t.day);
+        return ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     },
     getWeeklyFocus() {
-        return this.data.weeklyStudyTrends.map(t => t.focusMinutes);
+        const username = getUsernameFromToken();
+        const prefix = username + '_';
+        const history = JSON.parse(localStorage.getItem(prefix + 'study_history') || '{}');
+        const weekDates = getDatesForCurrentWeek();
+        
+        return weekDates.map(wd => {
+            const seconds = history[wd.dateStr] || 0;
+            return Math.round(seconds / 60); // convert to minutes
+        });
     },
     getWeeklyTarget() {
-        return this.data.weeklyStudyTrends.map(t => t.targetMinutes);
+        const targetMinutes = parseInt(localStorage.getItem('study_target_minutes')) || 150;
+        return [targetMinutes, targetMinutes, targetMinutes, targetMinutes, targetMinutes, targetMinutes, targetMinutes];
     },
     getWeeklyBreaks() {
-        return this.data.weeklyStudyTrends.map(t => t.breaks);
+        return [0, 0, 0, 0, 0, 0, 0];
     },
     getSubjectLabels() {
         return this.data.subjectMastery.map(s => s.subject);
