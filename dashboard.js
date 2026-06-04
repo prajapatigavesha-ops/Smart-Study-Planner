@@ -287,7 +287,24 @@ async function saveStats() {
     } catch(err) { console.error(err); }
 }
 
-const timelineSlots = ["8:00 AM", "10:00 AM", "12:00 PM", "2:00 PM", "4:00 PM", "6:00 PM", "8:00 PM"];
+function getDynamicTimelineSlots() {
+    const now = new Date();
+    let startHour = now.getHours();
+    if (now.getMinutes() > 0) {
+        startHour = (startHour + 1) % 24;
+    }
+    
+    const slots = [];
+    for (let i = 0; i < 7; i++) {
+        const h = (startHour + i * 2) % 24;
+        const ampm = h >= 12 ? 'PM' : 'AM';
+        let displayHour = h % 12;
+        if (displayHour === 0) displayHour = 12;
+        slots.push(`${displayHour}:00 ${ampm}`);
+    }
+    return slots;
+}
+const timelineSlots = getDynamicTimelineSlots();
 const taskSlotsMap = JSON.parse(localStorage.getItem('taskSlots') || '{}');
 
 function renderTasks() {
@@ -705,6 +722,19 @@ function generateHeatmap() {
   });
 }
 
+function getDynamicGreeting() {
+  const hour = new Date().getHours();
+  if (hour >= 22 || hour < 4) {
+      return "Hello, Night Owl! Ready for a late session?";
+  } else if (hour >= 4 && hour < 12) {
+      return "Good morning!";
+  } else if (hour >= 12 && hour < 17) {
+      return "Good afternoon!";
+  } else {
+      return "Good evening!";
+  }
+}
+
 /* --- AI DYNAMIC DAILY BRIEFING GENERATOR --- */
 function generateAIBriefing() {
   const briefingText = document.getElementById("briefingText");
@@ -736,7 +766,7 @@ function generateAIBriefing() {
   } else if (completedTasks > 0) {
       brief = `Great progress. You completed ${completedTasks} timeline task(s) and logged ${studyMins} minutes of focus. Peak productivity is forecast for your afternoon blocks.`;
   } else if (pendingTasks > 0) {
-      brief = `Good morning! Your timeline schedule is optimized. You have ${pendingTasks} topics scheduled today. Begin a Pomodoro timer session to kick off.`;
+      brief = `${getDynamicGreeting()} Your timeline schedule is optimized. You have ${pendingTasks} topics scheduled today. Begin a Pomodoro timer session to kick off.`;
   } else {
       brief = "Your study timeline is empty! Schedule a topic above (e.g. History Chapter 2 or React Hooks) to compile your daily AI briefing details.";
   }
