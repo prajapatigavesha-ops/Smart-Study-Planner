@@ -5,10 +5,22 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const path = require('path');
 require('dotenv').config();
+const nodemailer = require('nodemailer');
 const { OpenAI } = require('openai');
 
 const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY || 'dummy_key'
+});
+
+// Setup Nodemailer transporter
+const transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST || 'smtp.gmail.com',
+    port: parseInt(process.env.SMTP_PORT || '587'),
+    secure: process.env.SMTP_SECURE === 'true',
+    auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS
+    }
 });
 
 const app = express();
@@ -68,6 +80,12 @@ class HybridDatabase {
             fileData TEXT,
             uploadDate TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )`);
+        this.pool.query(`CREATE TABLE IF NOT EXISTS otps (
+            id SERIAL PRIMARY KEY,
+            email VARCHAR(255) UNIQUE,
+            otp VARCHAR(10),
+            expiresAt TIMESTAMP
+        )`);
     }
  
     initSqlite() {
@@ -97,6 +115,12 @@ class HybridDatabase {
                 fileSize INTEGER,
                 fileData TEXT,
                 uploadDate DATETIME DEFAULT CURRENT_TIMESTAMP
+            )`);
+            this.sqliteDb.run(`CREATE TABLE IF NOT EXISTS otps (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                email TEXT UNIQUE,
+                otp TEXT,
+                expiresAt DATETIME
             )`);
         });
     }
@@ -192,6 +216,109 @@ function authenticateToken(req, res, next) {
 }
 
 // --- Auth Routes ---
+
+app.post('/auth/send-otp', (req, res) => {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: "Email is required" });
+    
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+        return res.status(400).json({ error: "Invalid email format" });
+    }
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 mins
+
+    db.run(`DELETE FROM otps WHERE email = ?`, [email], (err) => {
+        if (err) return res.status(500).json({ error: "Failed to clear old OTP: " + err.message });
+
+        db.run(`INSERT INTO otps (email, otp, expiresAt) VALUES (?, ?, ?)`, [email, otp, expiresAt.toISOString()], async (insertErr) => {
+            if (insertErr) return res.status(500).json({ error: "Failed to store OTP: " + insertErr.message });
+
+            const hasEmailConfig = process.env.SMTP_USER && process.env.SMTP_PASS;
+
+            if (hasEmailConfig) {
+                const mailOptions = {
+                    from: `"Smart Study Planner" <${process.env.SMTP_USER}>`,
+                    to: email,
+                    subject: 'Your Verification Code - Smart Study Planner',
+                    html: `
+                        <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+                            <h2 style="color: #6366f1;">Smart Study Planner</h2>
+                            <p>Hello,</p>
+                            <p>Your one-time verification code is:</p>
+                            <div style="font-size: 24px; font-weight: bold; padding: 10px 20px; background-color: #f3f4f6; display: inline-block; letter-spacing: 4px; border-radius: 6px; margin: 10px 0; color: #4f46e5;">
+                                ${otp}
+                            </div>
+                            <p>This code will expire in 5 minutes.</p>
+                            <p style="font-size: 12px; color: #6b7280; margin-top: 20px;">If you did not request this code, please ignore this email.</p>
+                        </div>
+                    `
+                };
+
+                transporter.sendMail(mailOptions, (mailErr, info) => {
+                    if (mailErr) {
+                        console.error("Mail Send Error:", mailErr.message);
+                        if (process.env.NODE_ENV !== 'production') {
+                            return res.status(200).json({ 
+                                message: "OTP generated (dev mode fallback)", 
+                                _dev_otp: otp,
+                                warning: "SMTP failed: " + mailErr.message
+                            });
+                        }
+                        return res.status(500).json({ error: "Failed to send OTP email: " + mailErr.message });
+                    }
+                    res.json({ message: "OTP sent successfully to your email." });
+                });
+            } else {
+                console.log(`[OTP DEBUG] OTP for ${email} is: ${otp}`);
+                res.json({ 
+                    message: "OTP generated successfully (Development Mode)", 
+                    _dev_otp: otp 
+                });
+            }
+        });
+    });
+});
+
+app.post('/auth/verify-otp', (req, res) => {
+    const { email, otp } = req.body;
+    if (!email || !otp) return res.status(400).json({ error: "Email and OTP are required" });
+
+    db.get(`SELECT * FROM otps WHERE email = ?`, [email], (err, row) => {
+        if (err) return res.status(500).json({ error: err.message });
+        if (!row) return res.status(400).json({ error: "No OTP requested for this email" });
+
+        if (row.otp !== otp) return res.status(400).json({ error: "Incorrect verification code" });
+
+        const now = new Date();
+        const expiresAt = new Date(row.expiresAt);
+        if (now > expiresAt) {
+            return res.status(400).json({ error: "Verification code has expired" });
+        }
+
+        db.run(`DELETE FROM otps WHERE email = ?`, [email]);
+
+        db.get(`SELECT * FROM users WHERE username = ?`, [email], (userErr, user) => {
+            if (userErr) return res.status(500).json({ error: userErr.message });
+
+            if (!user) {
+                db.run(`INSERT INTO users (username, password) VALUES (?, ?)`, [email, 'passwordless'], function(createErr) {
+                    if (createErr) return res.status(500).json({ error: "Failed to register user" });
+                    
+                    const userId = this.lastID;
+                    db.run(`INSERT INTO stats (userId, totalStudyTime, sessionsCompleted) VALUES (?, 0, 0)`, [userId], (statsErr) => {
+                        const token = jwt.sign({ id: userId, username: email }, SECRET_KEY);
+                        res.json({ token, message: "Registered and logged in successfully" });
+                    });
+                });
+            } else {
+                const token = jwt.sign({ id: user.id, username: user.username }, SECRET_KEY);
+                res.json({ token, message: "Logged in successfully" });
+            }
+        });
+    });
+});
 
 app.post('/auth/signup', async (req, res) => {
     const { username, password } = req.body;

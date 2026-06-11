@@ -30,40 +30,221 @@
     </nav>
 
     <section class="dashboard-box animate-fade-rise" style="max-width: 400px; margin: 60px auto; padding: 40px; text-align: center;">
-      <h2 style="margin-top: 0; font-weight: normal; font-size: 2.5rem; font-family: 'Instrument Serif', serif;">Sign Up</h2>
-    <p style="color: var(--text-secondary); margin-bottom: 20px;">Create an account to save your tasks and stats globally.</p>
-    <form id="signupForm" style="display:flex; flex-direction:column; gap:20px; margin-top:20px; align-items: stretch;">
-      <input type="text" id="username" placeholder="Username" required>
-      <input type="password" id="password" placeholder="Password" required>
-      <button type="submit" class="signup" style="padding:14px; font-size:16px; cursor:pointer; width:100%;">Create Account</button>
-      <p id="errorMsg" style="color:#ff4444; font-size:14px; margin:0;"></p>
-    </form>
-  </section>
-  <script>
-    document.getElementById('signupForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const username = document.getElementById('username').value;
-        const password = document.getElementById('password').value;
-        const errorMsg = document.getElementById('errorMsg');
+      <h2 id="formTitle" style="margin-top: 0; font-weight: normal; font-size: 2.5rem; font-family: 'Instrument Serif', serif; margin-bottom: 10px;">Sign Up</h2>
+      <p id="formSubtitle" style="color: var(--text-secondary); margin-bottom: 25px; font-size: 0.95rem; line-height: 1.5;">Create an account with your email to save and sync your study grid globally.</p>
+      
+      <!-- Email Step Form -->
+      <form id="emailForm" style="display:flex; flex-direction:column; gap:20px; align-items: stretch;">
+        <input type="email" id="email" placeholder="student@university.edu" required style="text-align: center; font-size: 1.05rem; padding: 16px 20px;">
+        <button type="submit" id="sendOtpBtn" class="btn-primary" style="padding:14px; font-size:16px; cursor:pointer; width:100%; border-radius:30px; font-family: var(--font-body); font-weight: 600;">Send OTP Code</button>
+        <p id="emailErrorMsg" style="color:#ff4444; font-size:14px; margin:0; min-height: 20px;"></p>
+      </form>
+
+      <!-- OTP Verification Step (Initially Hidden) -->
+      <form id="otpForm" style="display:none; flex-direction:column; gap:20px; align-items: stretch; animation: fadeIn 0.4s ease;">
+        <div style="text-align: center; margin-bottom: 5px;">
+          <p style="color: var(--text-secondary); font-size: 0.9rem; margin: 0 0 8px 0;">We've sent a 6-digit code to:</p>
+          <strong id="displayEmail" style="color: var(--text-primary); font-size: 0.95rem; word-break: break-all;"></strong>
+        </div>
         
-        try {
-            const res = await fetch('/auth/signup', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password })
-            });
-            const data = await res.json();
-            if (res.ok) {
-                alert("Account created successfully! Please log in.");
-                window.location.href = 'login.html';
-            } else {
-                errorMsg.innerText = data.error;
-            }
-        } catch (err) {
-            errorMsg.innerText = "Connection error";
-        }
-    });
-  </script>
+        <input type="text" id="otpCode" placeholder="••••••" maxlength="6" pattern="\d{6}" required style="text-align: center; font-size: 1.5rem; letter-spacing: 0.5rem; font-weight: 700; padding: 12px; font-family: monospace;">
+        
+        <button type="submit" id="verifyBtn" class="btn-primary" style="padding:14px; font-size:16px; cursor:pointer; width:100%; border-radius:30px; font-family: var(--font-body); font-weight: 600;">Verify & Log In</button>
+        
+        <!-- Timer & Resend Option -->
+        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; margin-top: 5px;">
+          <span id="timerText" style="color: var(--text-secondary);">Resend in <span id="timerCountdown">05:00</span></span>
+          <button type="button" id="resendBtn" disabled style="background: transparent; border: none; color: var(--accent-indigo); cursor: not-allowed; opacity: 0.5; font-weight: 600; font-family: var(--font-body); font-size: 0.85rem; padding: 0; outline: none; box-shadow: none;">Resend OTP</button>
+        </div>
+
+        <button type="button" id="changeEmailBtn" style="background: transparent; border: none; color: var(--text-secondary); text-decoration: underline; cursor: pointer; font-size: 0.85rem; padding: 0; align-self: center; margin-top: 5px; box-shadow: none; outline: none;">Change Email</button>
+        
+        <p id="otpErrorMsg" style="color:#ff4444; font-size:14px; margin:0; min-height: 20px;"></p>
+
+        <!-- Development Mode Tooltip Widget -->
+        <div id="devOtpBox" style="display:none; margin-top:10px; padding:15px; background:rgba(99,102,241,0.08); border:1px solid rgba(99,102,241,0.25); border-radius:12px; color:#cbd5e1; font-size:13px; text-align:left; line-height: 1.4;">
+          <div style="font-weight: 700; color: #818cf8; display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
+            <span>🛠️ Development Assistance</span>
+          </div>
+          No SMTP configured in your <code>.env</code> file. For testing, please use the code below:
+          <div style="text-align: center; margin-top: 8px;">
+            <span id="devOtpCode" style="font-family: monospace; font-size: 1.4rem; font-weight: 800; color: #38bdf8; background: rgba(0,0,0,0.2); padding: 4px 12px; border-radius: 6px; border: 1px solid rgba(56,189,248,0.2); letter-spacing: 2px;">123456</span>
+          </div>
+        </div>
+      </form>
+    </section>
+    <script>
+      let countdownInterval;
+      let targetEmail = '';
+
+      const emailForm = document.getElementById('emailForm');
+      const otpForm = document.getElementById('otpForm');
+      const emailInput = document.getElementById('email');
+      const otpInput = document.getElementById('otpCode');
+      const displayEmail = document.getElementById('displayEmail');
+      
+      const sendOtpBtn = document.getElementById('sendOtpBtn');
+      const verifyBtn = document.getElementById('verifyBtn');
+      const resendBtn = document.getElementById('resendBtn');
+      const changeEmailBtn = document.getElementById('changeEmailBtn');
+      
+      const emailErrorMsg = document.getElementById('emailErrorMsg');
+      const otpErrorMsg = document.getElementById('otpErrorMsg');
+      
+      const timerText = document.getElementById('timerText');
+      const timerCountdown = document.getElementById('timerCountdown');
+      
+      const devOtpBox = document.getElementById('devOtpBox');
+      const devOtpCode = document.getElementById('devOtpCode');
+
+      // 1. Send OTP
+      emailForm.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          targetEmail = emailInput.value.trim();
+          emailErrorMsg.innerText = '';
+          sendOtpBtn.disabled = true;
+          sendOtpBtn.innerText = 'Sending...';
+
+          try {
+              const res = await fetch('/auth/send-otp', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ email: targetEmail })
+              });
+              const data = await res.json();
+              
+              if (res.ok) {
+                  // Switch forms
+                  emailForm.style.display = 'none';
+                  otpForm.style.display = 'flex';
+                  displayEmail.innerText = targetEmail;
+                  otpInput.value = '';
+                  otpInput.focus();
+                  
+                  // Setup dev helper if provided
+                  if (data._dev_otp) {
+                      devOtpBox.style.display = 'block';
+                      devOtpCode.innerText = data._dev_otp;
+                  } else {
+                      devOtpBox.style.display = 'none';
+                  }
+
+                  // Start countdown
+                  startCountdown(300); // 5 minutes
+              } else {
+                  emailErrorMsg.innerText = data.error || 'Failed to send OTP';
+              }
+          } catch (err) {
+              emailErrorMsg.innerText = 'Connection error';
+          } finally {
+              sendOtpBtn.disabled = false;
+              sendOtpBtn.innerText = 'Send OTP Code';
+          }
+      });
+
+      // 2. Verify OTP
+      otpForm.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const otp = otpInput.value.trim();
+          otpErrorMsg.innerText = '';
+          verifyBtn.disabled = true;
+          verifyBtn.innerText = 'Verifying...';
+
+          try {
+              const res = await fetch('/auth/verify-otp', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ email: targetEmail, otp })
+              });
+              const data = await res.json();
+              
+              if (res.ok) {
+                  localStorage.setItem('token', data.token);
+                  window.location.href = 'dashboard.html';
+              } else {
+                  otpErrorMsg.innerText = data.error || 'Incorrect or expired OTP';
+              }
+          } catch (err) {
+              otpErrorMsg.innerText = 'Connection error';
+          } finally {
+              verifyBtn.disabled = false;
+              verifyBtn.innerText = 'Verify & Log In';
+          }
+      });
+
+      // 3. Resend OTP
+      resendBtn.addEventListener('click', async () => {
+          otpErrorMsg.innerText = '';
+          resendBtn.disabled = true;
+          resendBtn.style.cursor = 'not-allowed';
+          resendBtn.style.opacity = '0.5';
+
+          try {
+              const res = await fetch('/auth/send-otp', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ email: targetEmail })
+              });
+              const data = await res.json();
+              
+              if (res.ok) {
+                  if (data._dev_otp) {
+                      devOtpCode.innerText = data._dev_otp;
+                  }
+                  startCountdown(300);
+                  alert("A new code has been sent!");
+              } else {
+                  otpErrorMsg.innerText = data.error || 'Failed to resend OTP';
+                  resendBtn.disabled = false;
+                  resendBtn.style.cursor = 'pointer';
+                  resendBtn.style.opacity = '1';
+              }
+          } catch (err) {
+              otpErrorMsg.innerText = 'Connection error';
+              resendBtn.disabled = false;
+              resendBtn.style.cursor = 'pointer';
+              resendBtn.style.opacity = '1';
+          }
+      });
+
+      // 4. Change Email (Go back)
+      changeEmailBtn.addEventListener('click', () => {
+          clearInterval(countdownInterval);
+          otpForm.style.display = 'none';
+          emailForm.style.display = 'flex';
+          emailInput.focus();
+      });
+
+      // Timer Helper
+      function startCountdown(seconds) {
+          clearInterval(countdownInterval);
+          resendBtn.disabled = true;
+          resendBtn.style.cursor = 'not-allowed';
+          resendBtn.style.opacity = '0.5';
+          timerText.style.display = 'inline';
+
+          function updateDisplay() {
+              const m = Math.floor(seconds / 60);
+              const s = seconds % 60;
+              timerCountdown.innerText = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+          }
+
+          updateDisplay();
+
+          countdownInterval = setInterval(() => {
+              seconds--;
+              updateDisplay();
+
+              if (seconds <= 0) {
+                  clearInterval(countdownInterval);
+                  resendBtn.disabled = false;
+                  resendBtn.style.cursor = 'pointer';
+                  resendBtn.style.opacity = '1';
+                  timerText.style.display = 'none';
+              }
+          }, 1000);
+      }
+    </script>
   </div> <!-- End content-wrapper -->
 </body>
 </html>
