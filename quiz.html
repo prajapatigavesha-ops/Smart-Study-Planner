@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>AI Quiz Master - Study Planner</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="theme.js"></script>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="icon" href="data:,">
+</head>
+<body>
+
+  <!-- Fullscreen background video -->
+  <video class="video-background" autoplay loop muted playsinline>
+    <source src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260314_131748_f2ca2a28-fed7-44c8-b9a9-bd9acdd5ec31.mp4" type="video/mp4">
+  </video>
+
+  <!-- Content wrapper -->
+  <div class="content-wrapper">
+
+    <!-- Navigation Bar -->
+    <nav class="relative z-10 flex row justify-between px-8 py-6 max-w-7xl mx-auto items-center" style="background: transparent; border-bottom: none; box-shadow: none;">
+      <div class="flex items-center">
+        <h1 class="text-xl tracking-tight text-foreground cursor-pointer" style="font-family: var(--font-body); font-weight: 600; margin: 0;" onclick="window.location.href='index.html'">Smart Study Planner</h1>
+      </div>
+      <div class="hidden md:flex items-center gap-8 text-sm"></div>
+      <div class="flex items-center gap-2">
+        <button onclick="window.location.href='dashboard.html'" class="liquid-glass rounded-full px-6 py-2.5 text-sm text-foreground hover:scale-[1.03]" style="cursor: pointer; border-radius: 50px; font-family: var(--font-body); font-weight: 600; border: none; margin-right: 5px;">Dashboard</button>
+        <button onclick="window.location.href='index.html'" style="padding: 8px 16px; cursor: pointer; background:transparent; border:none; color: var(--text-secondary); font-size: 0.85rem; font-family: var(--font-body); font-weight: 600;">Home</button>
+      </div>
+    </nav>
+
+    <!-- Quiz Arena Container -->
+    <main class="max-w-2xl mx-auto px-4 py-8 relative z-10">
+      
+      <!-- Card Header -->
+      <header class="text-center mb-8 animate-fade-in-up stagger-1">
+        <div class="inline-flex items-center justify-center p-3.5 bg-accent-indigo rounded-2xl mb-4 shadow-lg shadow-accent-indigo/25">
+          <i data-lucide="brain" class="w-8 h-8 text-white"></i>
+        </div>
+        <h2 style="font-family: 'Instrument Serif', serif; font-size: 2.8rem; font-weight: normal; margin: 0; line-height: 1.1;">AI Quiz Master</h2>
+        <p style="color: var(--text-secondary); margin-top: 6px; font-size: 0.95rem;">Generate instant practice tests on any topic</p>
+      </header>
+
+      <!-- View 1: Setup / Topic Input -->
+      <div id="quizSetupView" class="dashboard-box animate-fade-in-up stagger-2" style="padding: 35px; text-align: left;">
+        <form id="quizSetupForm" onsubmit="handleGenerate(event)" style="display: flex; flex-direction: column; gap: 24px;">
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <label style="font-weight: 700; font-size: 0.95rem; color: var(--text-secondary);">WHAT DO YOU WANT TO LEARN ABOUT?</label>
+            <input
+              type="text"
+              id="quizTopicInput"
+              placeholder="e.g. Photosynthesis, React Hooks, Roman History..."
+              required
+              style="width: 100%; font-size: 1.05rem; padding: 16px 20px; border-radius: 14px; background: rgba(255,255,255,0.03); border: 1px solid var(--glass-border); color: var(--text-primary); font-family: var(--font-body); outline: none; transition: border-color 0.3s;"
+            >
+          </div>
+          <button
+            type="submit"
+            class="btn-primary"
+            style="width: 100%; padding: 16px; font-size: 1.05rem; font-weight: 700; border-radius: 14px; display: flex; items-center; justify-content: center; gap: 8px; cursor: pointer; border: none; transition: transform 0.2s;"
+          >
+            <span>Generate Quiz</span>
+            <i data-lucide="arrow-right" class="w-5 h-5"></i>
+          </button>
+        </form>
+      </div>
+
+      <!-- View 2: Loading State -->
+      <div id="quizLoadingView" class="dashboard-box animate-fade-in-up stagger-2 text-center" style="display: none; padding: 40px; space-y: 16px;">
+        <div class="spinner" style="margin: 0 auto 20px auto;"></div>
+        <h3 style="margin: 0; font-size: 1.25rem; font-weight: 800; color: var(--text-primary);">AI is generating questions...</h3>
+        <p id="quizLoadingText" style="margin: 6px 0 0 0; font-size: 0.95rem; color: var(--text-secondary); font-style: italic;">Synthesizing concepts for topic...</p>
+      </div>
+
+      <!-- View 3: Playing Mode -->
+      <div id="quizPlayView" class="animate-fade-in-up stagger-2" style="display: none; display: flex; flex-direction: column; gap: 20px;">
+        
+        <!-- Header Info Row -->
+        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem; font-weight: 600; color: var(--text-secondary);">
+          <span id="questionProgressText">Question 1 of 5</span>
+          <span id="quizTopicBadge" style="background: rgba(255,255,255,0.08); px-3 py-1 px: 12px; padding: 4px 12px; border-radius: 20px; color: var(--text-primary);">Topic: Topic Name</span>
+        </div>
+
+        <!-- Question Card -->
+        <div class="dashboard-box" style="padding: 30px; text-align: left;">
+          <h3 id="questionText" style="margin-top: 0; font-size: 1.45rem; font-weight: 800; line-height: 1.35; margin-bottom: 24px; color: var(--text-primary);">
+            Question Text placeholder
+          </h3>
+          
+          <!-- Answer Options Container -->
+          <div id="answerOptionsContainer" style="display: flex; flex-direction: column; gap: 12px; width: 100%;">
+            <!-- Buttons injected dynamically -->
+          </div>
+
+          <!-- Rationale Card (Shown after select) -->
+          <div id="rationaleContainer" style="display: none; margin-top: 30px; padding: 20px; background: rgba(255,255,255,0.02); border: 1px solid var(--glass-border); border-radius: 16px;">
+            <h4 style="margin-top: 0; font-weight: 800; color: var(--text-primary); display: flex; align-items: center; gap: 8px; font-size: 1.05rem;">
+              <i data-lucide="brain" class="w-5 h-5 text-accent-indigo"></i> Rationale
+            </h4>
+            <p id="rationaleText" style="margin: 8px 0 0 0; font-size: 0.92rem; line-height: 1.5; color: var(--text-secondary);">
+              Rationale text goes here.
+            </p>
+            <button
+              id="nextQuestionBtn"
+              onclick="handleNext()"
+              class="btn-primary"
+              style="margin-top: 20px; width: 100%; padding: 12px; font-weight: 700; border-radius: 12px; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer;"
+            >
+              <span id="nextBtnText">Next Question</span>
+              <i data-lucide="arrow-right" class="w-4.5 h-4.5"></i>
+            </button>
+          </div>
+
+          <!-- Hint Section (Hidden after select) -->
+          <div id="hintContainer" style="margin-top: 24px; text-align: center;">
+            <p id="hintText" style="margin: 0; font-size: 0.82rem; color: var(--text-secondary); font-style: italic;">Hint: Hint text here</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- View 4: Finished Summary -->
+      <div id="quizFinishedView" class="dashboard-box animate-fade-in-up stagger-2 text-center" style="display: none; padding: 40px; display: flex; flex-direction: column; gap: 24px;">
+        <div class="inline-flex items-center justify-center w-24 h-24 bg-yellow-500/10 text-yellow-500 border border-yellow-500/20 rounded-full" style="margin: 0 auto 10px auto; display: flex; align-items: center; justify-content: center;">
+          <i data-lucide="trophy" class="w-12 h-12"></i>
+        </div>
+        <div>
+          <h3 style="margin: 0; font-size: 1.85rem; font-weight: 900; color: var(--text-primary);">Quiz Completed!</h3>
+          <p id="scoreReportText" style="color: var(--text-secondary); margin-top: 6px; font-size: 1.05rem;">You scored 0 out of 5</p>
+        </div>
+        
+        <div style="display: flex; gap: 16px; width: 100%;">
+          <div style="flex: 1; padding: 16px; background: rgba(255,255,255,0.02); border: 1px solid var(--glass-border); border-radius: 16px; display: flex; flex-direction: column; gap: 4px;">
+            <span style="font-size: 0.72rem; font-weight: 800; color: var(--text-secondary); uppercase tracking-wider; letter-spacing:0.05em;">ACCURACY</span>
+            <span id="accuracyPercentText" style="font-size: 1.6rem; font-weight: 800; color: var(--accent-mint);">0%</span>
+          </div>
+          <div style="flex: 1; padding: 16px; background: rgba(255,255,255,0.02); border: 1px solid var(--glass-border); border-radius: 16px; display: flex; flex-direction: column; gap: 4px; overflow: hidden;">
+            <span style="font-size: 0.72rem; font-weight: 800; color: var(--text-secondary); uppercase tracking-wider; letter-spacing:0.05em;">TOPIC</span>
+            <span id="summaryTopicText" style="font-size: 1.15rem; font-weight: 800; color: var(--text-primary); text-overflow: ellipsis; white-space: nowrap; overflow: hidden; display: block; margin-top: 5px;">Topic</span>
+          </div>
+        </div>
+
+        <button
+          onclick="resetQuiz()"
+          class="btn-primary"
+          style="width: 100%; padding: 14px; font-weight: 700; border-radius: 12px; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; border: none;"
+        >
+          <i data-lucide="refresh-ccw" class="w-4.5 h-4.5"></i>
+          <span>Try Another Topic</span>
+        </button>
+      </div>
+
+    </main>
+  </div> <!-- End content-wrapper -->
+
+  <script src="quiz.js"></script>
+</body>
+</html>

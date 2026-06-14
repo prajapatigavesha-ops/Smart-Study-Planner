@@ -566,6 +566,122 @@ app.post('/api/chat', (req, res, next) => {
     }
 });
 
+// --- AI Quiz Master Endpoint ---
+app.post('/api/quiz/generate', authenticateToken, async (req, res) => {
+    const { topic } = req.body;
+    if (!topic || !topic.trim()) {
+        return res.status(400).json({ error: "Topic is required" });
+    }
+
+    if (process.env.OPENAI_API_KEY && (process.env.OPENAI_API_KEY.startsWith('sk-') || process.env.OPENAI_API_KEY.startsWith('proj-'))) {
+        try {
+            const systemPrompt = `You are an expert academic tutor and quiz generator. Your task is to generate a practice quiz about the requested topic.
+Generate exactly 5 challenging, conceptually deep multiple-choice questions for the topic.
+For each question, provide 4 answer options (one of which must be correct), a short hint, and a detailed explanation (rationale) for each answer option showing why it is correct or incorrect.
+
+You must respond strictly in JSON format matching this structure:
+{
+  "title": "[Topic Name] Quiz",
+  "questions": [
+    {
+      "question": "The question text here...",
+      "hint": "A subtle conceptual hint...",
+      "answerOptions": [
+        { "text": "Option 1 text", "isCorrect": false, "rationale": "Explanation of why this option is incorrect..." },
+        { "text": "Option 2 text", "isCorrect": true, "rationale": "Explanation of why this option is correct..." },
+        { "text": "Option 3 text", "isCorrect": false, "rationale": "Explanation of why this option is incorrect..." },
+        { "text": "Option 4 text", "isCorrect": false, "rationale": "Explanation of why this option is incorrect..." }
+      ]
+    }
+  ]
+}`;
+
+            const completion = await openai.chat.completions.create({
+                messages: [
+                    { role: "system", content: systemPrompt },
+                    { role: "user", content: `Generate a quiz about the topic: "${topic}"` }
+                ],
+                model: "gpt-3.5-turbo",
+                temperature: 0.5,
+                response_format: { type: "json_object" }
+            });
+
+            let replyText = completion.choices[0].message.content.trim();
+            const quizData = JSON.parse(replyText);
+            return res.json(quizData);
+        } catch (err) {
+            console.error("OpenAI Quiz Gen Error:", err.message);
+            const fallback = generateMockQuiz(topic);
+            return res.json(fallback);
+        }
+    } else {
+        const fallback = generateMockQuiz(topic);
+        setTimeout(() => {
+            res.json(fallback);
+        }, 1500);
+    }
+});
+
+// Mock Quiz Generator for simulated/offline mode
+function generateMockQuiz(topic) {
+    const formattedTopic = topic.charAt(0).toUpperCase() + topic.slice(1);
+    return {
+        title: `${formattedTopic} Practice Quiz`,
+        questions: [
+            {
+                question: `What is the primary conceptual foundation of ${formattedTopic}?`,
+                hint: "Think about the most essential definition or building block of this subject.",
+                answerOptions: [
+                    { text: "Option A: Core Theoretical Principles", isCorrect: true, rationale: "Correct! This represents the primary logical base that defines this concept." },
+                    { text: "Option B: Secondary Implementation Details", isCorrect: false, rationale: "Incorrect. While details are important, they are built on top of the core principles rather than defining them." },
+                    { text: "Option C: Edge Cases and Anomalies", isCorrect: false, rationale: "Incorrect. Edge cases represent outliers, not the core foundational theory." },
+                    { text: "Option D: Extraneous Historical Context", isCorrect: false, rationale: "Incorrect. History explains origin, but does not constitute the active conceptual mechanism." }
+                ]
+            },
+            {
+                question: `Which of the following describes the most common practical application of ${formattedTopic}?`,
+                hint: "How is this knowledge used by practitioners in the field?",
+                answerOptions: [
+                    { text: "Standardized industry workflows and problem-solving", isCorrect: true, rationale: "Correct! It is primarily used to resolve real-world challenges systematically." },
+                    { text: "Academic research and publishing only", isCorrect: false, rationale: "Incorrect. This subject has robust practical utility beyond academic boundaries." },
+                    { text: "Purely recreational puzzles", isCorrect: false, rationale: "Incorrect. While it can be enjoyable, its primary value is educational and professional." },
+                    { text: "Legacy archival systems", isCorrect: false, rationale: "Incorrect. This topic is highly active and relevant in modern disciplines." }
+                ]
+            },
+            {
+                question: `Which common misconception is associated with learning or applying ${formattedTopic}?`,
+                hint: "Consider what learners often oversimplify or confuse.",
+                answerOptions: [
+                    { text: "It is an static concept with no modern updates", isCorrect: false, rationale: "Incorrect. Most fields are constantly evolving with new discoveries." },
+                    { text: "It requires memorization without conceptual understanding", isCorrect: true, rationale: "Correct! Memorization alone leads to failure; deep structural comprehension is essential." },
+                    { text: "It is only useful for senior researchers", isCorrect: false, rationale: "Incorrect. Beginners benefit immensely from studying this foundational concept." },
+                    { text: "It is entirely independent of other scientific domains", isCorrect: false, rationale: "Incorrect. It is deeply cross-disciplinary and interfaces with other areas." }
+                ]
+            },
+            {
+                question: `How does mastering ${formattedTopic} affect cognitive modeling and future study plans?`,
+                hint: "Look at the downstream effects of understanding this topic.",
+                answerOptions: [
+                    { text: "It creates mental scaffolding that makes learning related concepts faster", isCorrect: true, rationale: "Correct! Understanding core models makes it much easier to grasp advanced topics later." },
+                    { text: "It limits creative thinking to narrow boundaries", isCorrect: false, rationale: "Incorrect. Understanding principles expands cognitive options rather than narrowing them." },
+                    { text: "It has no measurable impact on adjacent topics", isCorrect: false, rationale: "Incorrect. The cognitive overlap is highly significant." },
+                    { text: "It causes memory overload and inhibits retention", isCorrect: false, rationale: "Incorrect. Structured knowledge actually enhances working memory capacity." }
+                ]
+            },
+            {
+                question: `What is the most recommended study method to fully master ${formattedTopic}?`,
+                hint: "Think about the principles of active recall and simple explanations.",
+                answerOptions: [
+                    { text: "Passive re-reading of textbooks and highlight marking", isCorrect: false, rationale: "Incorrect. Passive reading has very low retention rates." },
+                    { text: "Explaining it simply in your own words and taking practice tests", isCorrect: true, rationale: "Correct! The Feynman Technique combined with active testing is the gold standard of mastery." },
+                    { text: "Rote memorization of flashcards without review gaps", isCorrect: false, rationale: "Incorrect. Without spaced intervals, knowledge is quickly forgotten." },
+                    { text: "Listening to passive lectures in the background", isCorrect: false, rationale: "Incorrect. Active engagement is required to build structural neural pathways." }
+                ]
+            }
+        ]
+    };
+}
+
 // --- AI Syllabus Manager Routes ---
 
 // 1. Upload syllabus file & parse topics

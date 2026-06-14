@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <title>Accountability Settings - Smart Study Planner</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            serif: ['Instrument Serif', 'serif'],
+          },
+          colors: {
+            glass: {
+              DEFAULT: 'rgba(255, 255, 255, 0.03)',
+              border: 'rgba(255, 255, 255, 0.08)',
+              hover: 'rgba(255, 255, 255, 0.06)',
+            },
+            accent: {
+              indigo: '#6366f1',
+              mint: '#10b981',
+              pink: '#ec4899',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  
+  <style>
+    body {
+      background: radial-gradient(circle at 50% 0%, #1e1b4b 0%, #090514 60%);
+      font-family: 'Inter', sans-serif;
+    }
+  </style>
+</head>
+<body class="min-h-screen text-slate-100 antialiased p-4 md:p-8 flex flex-col items-center justify-center">
+
+  <div class="w-full max-w-5xl mx-auto space-y-6">
+    
+    <!-- Top Header -->
+    <header class="flex items-center justify-between border-b border-glass-border pb-6">
+      <div class="flex items-center gap-3">
+        <div class="p-2.5 bg-accent-indigo/10 rounded-xl border border-accent-indigo/20">
+          <i data-lucide="shield-check" class="w-6 h-6 text-accent-indigo"></i>
+        </div>
+        <div>
+          <h1 class="text-2xl font-bold tracking-tight">Accountability Engine</h1>
+          <p class="text-sm text-slate-400">Configure notifications, nudges, and goal checkpoints</p>
+        </div>
+      </div>
+      <button onclick="window.location.href='dashboard.html'" class="px-5 py-2 rounded-full bg-glass border border-glass-border hover:bg-glass-hover text-sm font-semibold transition flex items-center gap-2">
+        <i data-lucide="arrow-left" class="w-4 h-4"></i> Back to Dashboard
+      </button>
+    </header>
+
+    <!-- Main Grid -->
+    <main class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      
+      <!-- Left Column: Settings Card -->
+      <section class="lg:col-span-5 bg-white/[0.02] border border-glass-border rounded-3xl p-6 md:p-8 backdrop-blur-xl shadow-2xl relative overflow-hidden group">
+        <!-- Subtle background glowing aura -->
+        <div class="absolute -right-16 -top-16 w-36 h-36 bg-accent-indigo/10 rounded-full blur-3xl pointer-events-none group-hover:bg-accent-indigo/15 transition-all duration-500"></div>
+        
+        <div class="relative space-y-6">
+          <div class="flex items-center gap-2">
+            <i data-lucide="bell" class="w-5 h-5 text-accent-indigo"></i>
+            <h2 class="text-lg font-bold">Nudge Configuration</h2>
+          </div>
+
+          <!-- Email Nudges Section -->
+          <div class="space-y-4">
+            <div class="flex items-start justify-between gap-4">
+              <div class="space-y-1">
+                <label for="nudgeToggle" class="text-sm font-semibold text-slate-200 cursor-pointer">Email Nudges</label>
+                <p class="text-xs text-slate-400 leading-relaxed">
+                  Send me an email if I miss my daily study goal.
+                </p>
+              </div>
+              <!-- Toggle Switch -->
+              <label class="relative inline-flex items-center cursor-pointer select-none">
+                <input type="checkbox" id="nudgeToggle" class="sr-only peer" checked onchange="toggleNudges(this.checked)">
+                <div class="w-11 h-6 bg-slate-800 rounded-full peer peer-focus:ring-2 peer-focus:ring-accent-indigo/30 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-slate-300 after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent-indigo peer-checked:after:bg-white peer-checked:after:border-white"></div>
+              </label>
+            </div>
+            
+            <p class="text-xs text-slate-400 leading-relaxed border-l-2 border-glass-border pl-3 py-0.5 italic">
+              "If you leave a 1-hour or 2-hour study block incomplete, we'll send a friendly nudge to help you get back on track."
+            </p>
+          </div>
+
+          <!-- Time Checkpoint Dropdown -->
+          <div class="space-y-2 pt-2 border-t border-glass-border">
+            <div class="flex items-center justify-between">
+              <label for="checkTimeSelect" class="text-xs font-bold text-slate-400 uppercase tracking-wider">When should we check your progress?</label>
+            </div>
+            <div class="relative">
+              <select id="checkTimeSelect" onchange="updateCheckTime(this.value)" class="w-full bg-slate-900/60 border border-glass-border rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-accent-indigo/50 cursor-pointer appearance-none">
+                <option value="6:00 PM">6:00 PM Daily</option>
+                <option value="7:00 PM">7:00 PM Daily</option>
+                <option value="8:00 PM">8:00 PM Daily</option>
+                <option value="9:00 PM" selected>9:00 PM Daily (Default)</option>
+                <option value="10:00 PM">10:00 PM Daily</option>
+                <option value="11:00 PM">11:00 PM Daily</option>
+              </select>
+              <div class="absolute inset-y-0 right-4 flex items-center pointer-events-none text-slate-400">
+                <i data-lucide="chevron-down" class="w-4 h-4"></i>
+              </div>
+            </div>
+          </div>
+
+          <!-- Interactive Preview Simulator -->
+          <div id="simulatorContainer" class="space-y-4 pt-4 border-t border-glass-border">
+            <div class="flex justify-between items-center text-xs">
+              <span class="font-bold text-slate-400 uppercase tracking-wider">Simulate Study Progress</span>
+              <span id="simulatorLabel" class="font-bold text-accent-indigo">30 / 120 mins</span>
+            </div>
+            <input type="range" id="progressSlider" min="0" max="120" value="30" oninput="simulateProgress(this.value)" class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-accent-indigo">
+            <div class="flex justify-between text-[10px] text-slate-500 font-bold">
+              <span>0m (Missed completely)</span>
+              <span>120m (Completed)</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Right Column: Email Nudge Preview -->
+      <section class="lg:col-span-7 bg-white/[0.01] border border-glass-border rounded-3xl p-6 backdrop-blur-xl shadow-2xl space-y-4 relative">
+        <div class="flex items-center justify-between border-b border-glass-border pb-4">
+          <div class="flex items-center gap-2 text-slate-400">
+            <i data-lucide="mail" class="w-4.5 h-4.5"></i>
+            <span class="text-xs font-semibold tracking-wide uppercase">Automated Nudge Email Preview</span>
+          </div>
+          <!-- Live Indicator Badge -->
+          <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-accent-mint/10 text-accent-mint border border-accent-mint/20">
+            <span class="w-1.5 h-1.5 rounded-full bg-accent-mint animate-pulse"></span> Dynamic
+          </span>
+        </div>
+
+        <!-- Simulated Inbox Wrapper -->
+        <div class="rounded-2xl border border-glass-border overflow-hidden bg-slate-950/70 shadow-inner">
+          <!-- Email Envelope Headers -->
+          <div class="bg-slate-900/50 p-4 border-b border-glass-border text-xs space-y-1.5">
+            <div class="flex justify-between">
+              <span class="text-slate-400">From: <strong class="text-slate-200">Smart Study Assistant</strong> &lt;nudges@studyplanner.ai&gt;</span>
+              <span id="headerTime" class="text-slate-500 font-medium">9:00 PM</span>
+            </div>
+            <div>
+              <span class="text-slate-400">To: <span class="text-slate-300">student@university.edu</span></span>
+            </div>
+            <div class="pt-1 flex items-center gap-1.5">
+              <span class="text-slate-400 font-semibold">Subject:</span>
+              <span id="emailSubject" class="text-slate-200 font-bold text-sm">⚠️ Keep going! Just 90 mins left to hit your daily study goal</span>
+            </div>
+          </div>
+
+          <!-- Email Core Body -->
+          <div id="emailBodyContainer" class="p-6 md:p-8 bg-[#0b071a] space-y-6 text-slate-300 relative transition-all duration-300">
+            <!-- Disabled Overlay -->
+            <div id="disabledOverlay" class="absolute inset-0 bg-slate-950/80 backdrop-blur-sm z-10 hidden flex-col items-center justify-center text-center p-6 transition-all duration-300">
+              <div class="p-3 bg-slate-900 border border-glass-border rounded-full mb-3 text-slate-400">
+                <i data-lucide="bell-off" class="w-6 h-6"></i>
+              </div>
+              <h3 class="font-bold text-slate-200">Email Nudges Disabled</h3>
+              <p class="text-xs text-slate-400 max-w-xs mt-1">Enable "Email Nudges" toggle on the left to activate checkpoints and previews.</p>
+            </div>
+
+            <!-- Email Design Header -->
+            <div class="text-center space-y-2 pb-4 border-b border-white/5">
+              <h2 class="text-xl font-bold tracking-tight text-white" style="font-family: var(--font-body);">Smart Study Planner</h2>
+              <p class="text-[11px] text-accent-indigo font-bold uppercase tracking-widest">Daily Goal Checkpoint</p>
+            </div>
+
+            <!-- Message Body -->
+            <div class="space-y-4 text-sm leading-relaxed text-slate-300">
+              <p>Hey there,</p>
+              <p id="emailMessageText">
+                We noticed that you've completed <strong class="text-white">30 minutes</strong> of your <strong class="text-white">2-hour</strong> study budget today. You're so close to securing your focus streak!
+              </p>
+              <p>
+                Take a short deep breath, stretch, and let's lock in the rest of your session. You've got this!
+              </p>
+            </div>
+
+            <!-- Progress Card in Email -->
+            <div class="bg-white/[0.02] border border-white/5 rounded-2xl p-5 space-y-4">
+              <div class="flex justify-between items-center text-xs">
+                <span class="font-bold text-slate-400">Today's Focus Progress</span>
+                <span id="emailProgressLabel" class="font-bold text-white">30 mins / 120 mins (25%)</span>
+              </div>
+              <!-- Progress bar -->
+              <div class="w-full bg-slate-900 rounded-full h-3.5 p-0.5 border border-white/5">
+                <div id="emailProgressBar" class="bg-gradient-to-r from-accent-indigo to-accent-pink h-full rounded-full transition-all duration-500 shadow-lg shadow-accent-indigo/25" style="width: 25%"></div>
+              </div>
+            </div>
+
+            <!-- CTA Button -->
+            <div class="text-center pt-4">
+              <a href="#" class="inline-flex items-center gap-2 px-8 py-3.5 rounded-full bg-accent-indigo hover:bg-accent-indigo/90 text-white font-bold text-sm shadow-xl shadow-accent-indigo/25 hover:shadow-accent-indigo/40 hover:scale-[1.02] active:scale-[0.98] transition">
+                <span>Resume Studying</span>
+                <i data-lucide="arrow-right" class="w-4 h-4"></i>
+              </a>
+            </div>
+
+            <!-- Footer Details -->
+            <div class="text-center text-[10px] text-slate-500 border-t border-white/5 pt-6 space-y-1">
+              <p>Sent automatically at your requested checkpoint: <span id="footerCheckpointTime">9:00 PM</span>.</p>
+              <p>Want to adjust nudge times? Update your <a href="#" class="text-accent-indigo underline font-medium">Accountability Dashboard</a>.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Bottom Instructions Footer -->
+    <footer class="text-center py-6 text-xs text-slate-500 border-t border-glass-border">
+      <p>&copy; 2026 Smart Study Planner AI. Dynamic components built with Tailwind CSS & Lucide Icons.</p>
+    </footer>
+
+  </div>
+
+  <script>
+    // Elements references
+    const nudgeToggle = document.getElementById('nudgeToggle');
+    const checkTimeSelect = document.getElementById('checkTimeSelect');
+    const progressSlider = document.getElementById('progressSlider');
+    const simulatorLabel = document.getElementById('simulatorLabel');
+    const disabledOverlay = document.getElementById('disabledOverlay');
+    const simulatorContainer = document.getElementById('simulatorContainer');
+    
+    // Email elements references
+    const emailSubject = document.getElementById('emailSubject');
+    const emailMessageText = document.getElementById('emailMessageText');
+    const emailProgressLabel = document.getElementById('emailProgressLabel');
+    const emailProgressBar = document.getElementById('emailProgressBar');
+    const headerTime = document.getElementById('headerTime');
+    const footerCheckpointTime = document.getElementById('footerCheckpointTime');
+
+    // 1. Toggle Nudge Functionality
+    function toggleNudges(enabled) {
+      if (enabled) {
+        disabledOverlay.classList.add('hidden');
+        simulatorContainer.style.opacity = '1';
+        progressSlider.disabled = false;
+      } else {
+        disabledOverlay.classList.remove('hidden');
+        simulatorContainer.style.opacity = '0.4';
+        progressSlider.disabled = true;
+      }
+    }
+
+    // 2. Update Checkpoint Time
+    function updateCheckTime(timeVal) {
+      headerTime.innerText = timeVal;
+      footerCheckpointTime.innerText = timeVal;
+    }
+
+    // 3. Simulate Progress Functionality
+    function simulateProgress(minutes) {
+      const minVal = parseInt(minutes);
+      const totalVal = 120;
+      const percent = Math.round((minVal / totalVal) * 100);
+      
+      // Update Simulator Label
+      simulatorLabel.innerText = `${minVal} / ${totalVal} mins`;
+      
+      // Update Email Progress Label & Bar
+      emailProgressLabel.innerText = `${minVal} mins / ${totalVal} mins (${percent}%)`;
+      emailProgressBar.style.width = `${percent}%`;
+
+      // Dynamically adjust color gradients based on completion
+      if (percent < 30) {
+        emailProgressBar.className = "bg-gradient-to-r from-red-500 to-accent-pink h-full rounded-full transition-all duration-300 shadow-lg";
+      } else if (percent < 75) {
+        emailProgressBar.className = "bg-gradient-to-r from-accent-indigo to-accent-pink h-full rounded-full transition-all duration-300 shadow-lg shadow-accent-indigo/25";
+      } else {
+        emailProgressBar.className = "bg-gradient-to-r from-accent-indigo to-accent-mint h-full rounded-full transition-all duration-300 shadow-lg shadow-accent-mint/25";
+      }
+
+      // Update Email Subject & Message based on progress levels
+      let subjectStr = "";
+      let messageStr = "";
+      
+      if (minVal === 0) {
+        subjectStr = "🚨 Warning: You haven't started your daily study block yet!";
+        messageStr = `Hey student, we noticed you have completed <strong class="text-white">0 minutes</strong> of your <strong class="text-white">2-hour</strong> study budget today. Don't let your daily goal slip away before the day ends!`;
+      } else if (percent < 50) {
+        const remaining = totalVal - minVal;
+        subjectStr = `⚠️ Keep going! Just ${remaining} mins left to hit your daily study goal`;
+        messageStr = `Hey student, we noticed you have completed <strong class="text-white">${minVal} minutes</strong> of your <strong class="text-white">2-hour</strong> study budget today. You're off to a solid start, but you still have a bit of focus left to secure your daily streak.`;
+      } else if (percent < 100) {
+        const remaining = totalVal - minVal;
+        subjectStr = `🔥 So close! Just ${remaining} mins to lock in today's study goal`;
+        messageStr = `Hey student, outstanding effort today! You have completed <strong class="text-white">${minVal} minutes</strong> of your <strong class="text-white">2-hour</strong> study budget. You only need <strong class="text-white">${remaining} minutes more</strong> to hit 100% completion!`;
+      } else {
+        subjectStr = "🎉 Congratulations! You hit today's daily study goal!";
+        messageStr = `Hey student, spectacular work! You have completed <strong class="text-white">120 minutes</strong> of your <strong class="text-white">2-hour</strong> study budget today. Your focus streak is fully locked and secure. Enjoy your break!`;
+      }
+
+      emailSubject.innerText = subjectStr;
+      emailMessageText.innerHTML = messageStr;
+    }
+
+    // Initialize Lucide Icons
+    document.addEventListener("DOMContentLoaded", () => {
+      lucide.createIcons();
+      // Initialize with default progress slider value (30 mins)
+      simulateProgress(progressSlider.value);
+    });
+  </script>
+</body>
+</html>
