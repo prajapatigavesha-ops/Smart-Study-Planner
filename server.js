@@ -66,6 +66,10 @@ class HybridDatabase {
             completed BOOLEAN,
             tag VARCHAR(255)
         )`);
+        this.pool.query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS priority VARCHAR(50) DEFAULT 'Medium'`, (err) => {});
+        this.pool.query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS deadline VARCHAR(50)`, (err) => {});
+        this.pool.query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS duration_hours DOUBLE PRECISION DEFAULT 1.0`, (err) => {});
+        this.pool.query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS "missedCount" INTEGER DEFAULT 0`, (err) => {});
         this.pool.query(`CREATE TABLE IF NOT EXISTS stats (
             userId INTEGER PRIMARY KEY,
             totalStudyTime INTEGER DEFAULT 0,
@@ -102,6 +106,10 @@ class HybridDatabase {
                 completed BOOLEAN
             )`);
             this.sqliteDb.run(`ALTER TABLE tasks ADD COLUMN tag TEXT`, (err) => {});
+            this.sqliteDb.run(`ALTER TABLE tasks ADD COLUMN priority TEXT DEFAULT 'Medium'`, (err) => {});
+            this.sqliteDb.run(`ALTER TABLE tasks ADD COLUMN deadline TEXT`, (err) => {});
+            this.sqliteDb.run(`ALTER TABLE tasks ADD COLUMN duration_hours REAL DEFAULT 1.0`, (err) => {});
+            this.sqliteDb.run(`ALTER TABLE tasks ADD COLUMN missedCount INTEGER DEFAULT 0`, (err) => {});
             this.sqliteDb.run(`CREATE TABLE IF NOT EXISTS stats (
                 userId INTEGER PRIMARY KEY,
                 totalStudyTime INTEGER DEFAULT 0,
@@ -371,31 +379,95 @@ app.post('/auth/login', (req, res) => {
 app.get('/api/tasks', authenticateToken, (req, res) => {
     db.all(`SELECT * FROM tasks WHERE userId = ?`, [req.user.id], (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });
-        res.json(rows.map(r => ({ id: r.id, text: r.text, completed: Boolean(r.completed), tag: r.tag || '' })));
+        res.json(rows.map(r => ({
+            id: r.id,
+            text: r.text,
+            completed: Boolean(r.completed),
+            tag: r.tag || '',
+            priority: r.priority || 'Medium',
+            deadline: r.deadline || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            duration_hours: Number(r.duration_hours !== undefined ? r.duration_hours : (r.duration_hours || 1.0)),
+            missedCount: Number(r.missedCount !== undefined ? r.missedCount : (r.missedcount || 0))
+        })));
     });
 });
 
 // Add a task
 app.post('/api/tasks', authenticateToken, (req, res) => {
-    const { text, completed, tag } = req.body;
+    const { text, completed, tag, priority, deadline, duration_hours } = req.body;
     const isCompleted = completed ? 1 : 0;
     const taskTag = tag || '';
+    const taskPriority = priority || 'Medium';
+    const defaultDeadline = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const taskDeadline = deadline || defaultDeadline;
+    const taskDuration = Number(duration_hours || 1.0);
     
-    db.run(`INSERT INTO tasks (userId, text, completed, tag) VALUES (?, ?, ?, ?)`, [req.user.id, text, isCompleted, taskTag], function(err) {
-        if (err) return res.status(500).json({ error: err.message });
-        res.status(201).json({ id: this.lastID, text, completed: Boolean(isCompleted), tag: taskTag });
-    });
+    db.run(
+        `INSERT INTO tasks (userId, text, completed, tag, priority, deadline, duration_hours, missedCount) VALUES (?, ?, ?, ?, ?, ?, ?, 0)`,
+        [req.user.id, text, isCompleted, taskTag, taskPriority, taskDeadline, taskDuration],
+        function(err) {
+            if (err) return res.status(500).json({ error: err.message });
+            res.status(201).json({
+                id: this.lastID,
+                text,
+                completed: Boolean(isCompleted),
+                tag: taskTag,
+                priority: taskPriority,
+                deadline: taskDeadline,
+                duration_hours: taskDuration,
+                missedCount: 0
+            });
+        }
+    );
 });
 
-// Update a task (toggle completion)
+// Update a task (flexible update support for completed, missedCount, text, tag, priority, deadline, duration_hours)
 app.put('/api/tasks/:id', authenticateToken, (req, res) => {
-    const { completed } = req.body;
-    const isCompleted = completed ? 1 : 0;
+    const { completed, missedCount, text, tag, priority, deadline, duration_hours } = req.body;
     
-    db.run(`UPDATE tasks SET completed = ? WHERE id = ? AND userId = ?`, [isCompleted, req.params.id, req.user.id], function(err) {
+    let updates = [];
+    let params = [];
+    
+    if (completed !== undefined) {
+        updates.push("completed = ?");
+        params.push(completed ? 1 : 0);
+    }
+    if (missedCount !== undefined) {
+        updates.push("missedCount = ?");
+        params.push(Number(missedCount));
+    }
+    if (text !== undefined) {
+        updates.push("text = ?");
+        params.push(text);
+    }
+    if (tag !== undefined) {
+        updates.push("tag = ?");
+        params.push(tag);
+    }
+    if (priority !== undefined) {
+        updates.push("priority = ?");
+        params.push(priority);
+    }
+    if (deadline !== undefined) {
+        updates.push("deadline = ?");
+        params.push(deadline);
+    }
+    if (duration_hours !== undefined) {
+        updates.push("duration_hours = ?");
+        params.push(Number(duration_hours));
+    }
+    
+    if (updates.length === 0) {
+        return res.status(400).json({ error: "No fields to update" });
+    }
+    
+    const query = `UPDATE tasks SET ${updates.join(', ')} WHERE id = ? AND userId = ?`;
+    params.push(req.params.id, req.user.id);
+    
+    db.run(query, params, function(err) {
         if (err) return res.status(500).json({ error: err.message });
         if (this.changes === 0) return res.status(404).json({ error: "Task not found" });
-        res.json({ message: "Task updated" });
+        res.json({ message: "Task updated successfully" });
     });
 });
 

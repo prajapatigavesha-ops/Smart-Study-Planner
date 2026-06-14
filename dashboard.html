@@ -54,15 +54,54 @@
     <div class="dashboard-grid">
       <!-- Left Column: Interactive Study Planner (Timeline) -->
       <div class="dashboard-box animate-fade-in-up stagger-2" style="display:flex; flex-direction:column;">
-        <h2 style="margin-top: 0; font-size: 1.5rem; font-weight: 800; border-bottom: 1px solid var(--glass-border); padding-bottom: 12px; margin-bottom: 20px;">📅 Interactive Timeline</h2>
+        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 1px solid var(--glass-border); padding-bottom: 12px; margin-bottom: 20px; flex-wrap:wrap; gap:10px;">
+          <h2 style="margin: 0; font-size: 1.5rem; font-weight: 800;">📅 Dynamic Study Schedule</h2>
+          <div style="display:flex; align-items:center; gap:8px; font-size:0.85rem; font-weight:600; color:var(--text-secondary);">
+            <span>Daily Budget:</span>
+            <select id="studyBudgetSelect" onchange="changeStudyBudget(this.value)" style="padding: 4px 8px; border-radius: 8px; background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); color: var(--text-primary); cursor: pointer; outline: none; font-weight: 700;">
+              <option value="2" style="background:#1e1e24;">2h / day</option>
+              <option value="3" style="background:#1e1e24;">3h / day</option>
+              <option value="4" selected style="background:#1e1e24;">4h / day</option>
+              <option value="5" style="background:#1e1e24;">5h / day</option>
+              <option value="6" style="background:#1e1e24;">6h / day</option>
+              <option value="8" style="background:#1e1e24;">8h / day</option>
+            </select>
+          </div>
+        </div>
         
         <!-- Dynamic Tag Filter Bar -->
         <div id="tagFilterContainer"></div>
         
-        <div style="display:flex; gap:10px; margin-bottom: 20px; align-items:center; flex-wrap: wrap;">
-          <input type="text" id="taskInput" placeholder="Add study topic (e.g., Coding React Components)" style="flex:2; min-width: 200px;">
-          <input type="text" id="taskTagInput" placeholder="Tag (e.g. Math)" style="flex:1; min-width: 100px; padding: 10px 16px !important; font-size: 0.9rem !important;">
-          <button onclick="addTask()" class="btn-primary" style="border-radius:30px; padding: 12px 24px;">Schedule</button>
+        <!-- Task input form container -->
+        <div style="display:flex; flex-direction:column; gap:12px; margin-bottom: 25px; padding: 15px; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--glass-border); border-radius: 16px;">
+          <div style="display:flex; gap:10px; align-items:center; flex-wrap: wrap;">
+            <input type="text" id="taskInput" placeholder="Add study topic (e.g., Coding React Components)" style="flex:3; min-width: 200px;">
+            <input type="text" id="taskTagInput" placeholder="Tag (e.g. Math)" style="flex:1; min-width: 100px; padding: 10px 16px !important; font-size: 0.9rem !important;">
+          </div>
+          <div style="display:flex; gap:10px; align-items:center; flex-wrap: wrap; justify-content: space-between;">
+            <div style="display:flex; gap:12px; align-items:center; flex-wrap: wrap; flex: 1;">
+              <!-- Priority dropdown -->
+              <div style="display:flex; flex-direction:column; gap:4px;">
+                <label style="font-size:0.7rem; font-weight:800; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.05em;">Priority</label>
+                <select id="taskPriorityInput" style="padding: 10px 16px; border-radius: 10px; background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); color: var(--text-primary); outline:none; font-family: var(--font-body); font-size:0.9rem; cursor:pointer;">
+                  <option value="Low" style="background:#1e1e24; color:#fff;">Low</option>
+                  <option value="Medium" selected style="background:#1e1e24; color:#fff;">Medium</option>
+                  <option value="High" style="background:#1e1e24; color:#fff;">High</option>
+                </select>
+              </div>
+              <!-- Duration input -->
+              <div style="display:flex; flex-direction:column; gap:4px;">
+                <label style="font-size:0.7rem; font-weight:800; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.05em;">Duration (Hours)</label>
+                <input type="number" id="taskDurationInput" value="1.0" min="0.1" max="24" step="0.5" style="width: 110px; padding: 10px 12px !important; font-size: 0.9rem !important; text-align: center;">
+              </div>
+              <!-- Deadline date picker -->
+              <div style="display:flex; flex-direction:column; gap:4px;">
+                <label style="font-size:0.7rem; font-weight:800; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.05em;">Deadline</label>
+                <input type="date" id="taskDeadlineInput" style="padding: 10px 12px !important; font-size: 0.9rem !important; width: 140px;">
+              </div>
+            </div>
+            <button onclick="addTask()" class="btn-primary" style="border-radius:30px; padding: 12px 24px; cursor: pointer;">Schedule Topic</button>
+          </div>
         </div>
         
         <!-- Timeline scroll track -->

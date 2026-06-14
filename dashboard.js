@@ -11,6 +11,118 @@ function getAuthHeaders() {
     };
 }
 
+// --- Dynamic Study Scheduler Engine ---
+class StudyScheduler {
+    constructor(config = {}) {
+        this.priorityWeights = config.priorityWeights || { "High": 3.0, "Medium": 2.0, "Low": 1.0 };
+        this.missedBoostFactors = config.missedBoostFactors || { "High": 1.5, "Medium": 1.0, "Low": 0.5 };
+        this.epsilon = config.epsilon || 0.1;
+    }
+
+    calculateUrgencyScore(topic, referenceDate = new Date()) {
+        const priority = topic.priority || "Medium";
+        const baseWeight = this.priorityWeights[priority] || 2.0;
+        const missedCount = topic.missedCount || 0;
+        const boostFactor = this.missedBoostFactors[priority] || 1.0;
+        const effectiveWeight = baseWeight + (missedCount * boostFactor);
+        
+        const daysRemaining = Math.max(0, (new Date(topic.deadline) - referenceDate) / (1000 * 60 * 60 * 24));
+        const urgencyScore = effectiveWeight * (1 + (1 / (daysRemaining + this.epsilon)));
+        
+        return { urgencyScore, effectiveWeight, daysRemaining };
+    }
+
+    generateSchedule(topics, dailyHours = 4, referenceDate = new Date()) {
+        const scored = topics.map(t => ({ ...t, ...this.calculateUrgencyScore(t, referenceDate) }));
+        scored.sort((a, b) => b.urgencyScore - a.urgencyScore);
+
+        const dailyBlocks = [];
+        let currentDayIdx = 0, currentDayHoursLeft = dailyHours, currentDayTasks = [];
+
+        const formatDate = (date) => {
+            const d = new Date(date);
+            const month = '' + (d.getMonth() + 1);
+            const day = '' + d.getDate();
+            const year = d.getFullYear();
+            return [year, month.padStart(2, '0'), day.padStart(2, '0')].join('-');
+        };
+
+        const flushDay = () => {
+            if (currentDayTasks.length > 0) {
+                const date = new Date(referenceDate);
+                date.setDate(date.getDate() + currentDayIdx);
+                dailyBlocks.push({
+                    day: currentDayIdx + 1,
+                    date: formatDate(date),
+                    hoursScheduled: Number((dailyHours - currentDayHoursLeft).toFixed(2)),
+                    tasks: currentDayTasks
+                });
+            }
+        };
+
+        const queue = scored.map(t => ({ topic: t, hoursRemaining: t.duration_hours }));
+        while (queue.length > 0) {
+            const current = queue.shift();
+            const { topic, hoursRemaining } = current;
+            if (hoursRemaining <= 0) continue;
+
+            const roundedHours = Number(hoursRemaining.toFixed(2));
+            const roundedDayLeft = Number(currentDayHoursLeft.toFixed(2));
+
+            if (roundedHours <= roundedDayLeft) {
+                currentDayTasks.push({
+                    id: topic.id,
+                    title: topic.text,
+                    priority: topic.priority,
+                    deadline: topic.deadline,
+                    urgencyScore: Number(topic.urgencyScore.toFixed(3)),
+                    hoursScheduled: roundedHours,
+                    isSplit: false,
+                    completed: topic.completed,
+                    tag: topic.tag,
+                    missedCount: topic.missedCount
+                });
+                currentDayHoursLeft -= roundedHours;
+            } else {
+                const allocated = roundedDayLeft;
+                if (allocated > 0) {
+                    currentDayTasks.push({
+                        id: topic.id,
+                        title: topic.text,
+                        priority: topic.priority,
+                        deadline: topic.deadline,
+                        urgencyScore: Number(topic.urgencyScore.toFixed(3)),
+                        hoursScheduled: allocated,
+                        isSplit: true,
+                        segment: "Part 1",
+                        completed: topic.completed,
+                        tag: topic.tag,
+                        missedCount: topic.missedCount
+                    });
+                }
+                queue.unshift({ topic, hoursRemaining: roundedHours - allocated });
+                flushDay();
+                currentDayIdx++;
+                currentDayHoursLeft = dailyHours;
+                currentDayTasks = [];
+            }
+        }
+        flushDay();
+        return dailyBlocks;
+    }
+}
+const scheduler = new StudyScheduler();
+
+// Daily Hours Budget management
+let dailyHoursBudget = Number(localStorage.getItem('study_hours_budget')) || 4;
+
+function changeStudyBudget(value) {
+    dailyHoursBudget = Number(value);
+    localStorage.setItem('study_hours_budget', value);
+    renderTasks();
+}
+window.changeStudyBudget = changeStudyBudget;
+
 // --- Logout ---
 function logout() {
     localStorage.removeItem('token');
@@ -182,6 +294,10 @@ document.addEventListener("DOMContentLoaded", () => {
         `;
         navDiv.appendChild(profileContainer);
     }
+    const budgetSelect = document.getElementById("studyBudgetSelect");
+    if (budgetSelect) {
+        budgetSelect.value = dailyHoursBudget.toString();
+    }
     checkStreak();
     fetchTasks();
     fetchStats();
@@ -314,51 +430,127 @@ function renderTasks() {
   const timelineList = document.getElementById("timelineList");
   if (!timelineList) return;
   timelineList.innerHTML = "";
-  
-  // Ensure every task has a slotIndex
-  tasks.forEach((task, index) => {
-    if (taskSlotsMap[task.id] === undefined) {
-      taskSlotsMap[task.id] = index % timelineSlots.length;
-    }
-  });
-  localStorage.setItem('taskSlots', JSON.stringify(taskSlotsMap));
 
   // Filter tasks by activeFilter
   const filteredTasks = activeFilter === 'All'
     ? tasks
     : tasks.filter(t => t.tag === activeFilter);
 
-  // Sort tasks chronologically by slotIndex
-  const sortedTasks = [...filteredTasks].sort((a, b) => {
-    return (taskSlotsMap[a.id] || 0) - (taskSlotsMap[b.id] || 0);
+  const incompleteTasks = filteredTasks.filter(t => !t.completed);
+  const completedTasks = filteredTasks.filter(t => t.completed);
+
+  // Run the scheduler algorithm on incomplete tasks
+  const dailyBlocks = scheduler.generateSchedule(incompleteTasks, dailyHoursBudget, new Date());
+
+  if (dailyBlocks.length === 0 && completedTasks.length === 0) {
+    timelineList.innerHTML = `<div style="color:var(--text-secondary); text-align:center; padding: 20px; font-style:italic; font-size:0.95rem;">No tasks scheduled under '${activeFilter}'. Add topics above!</div>`;
+    updateVisuals();
+    return;
+  }
+
+  // Helper to get relative day label
+  const getDayLabel = (block) => {
+    if (block.day === 1) return "Day 1 (Today)";
+    if (block.day === 2) return "Day 2 (Tomorrow)";
+    return `Day ${block.day}`;
+  };
+
+  // Render Daily Blocks
+  dailyBlocks.forEach(block => {
+    const dayHeader = document.createElement("div");
+    dayHeader.className = "day-header";
+    dayHeader.style = "margin-top: 15px; margin-bottom: 10px; font-weight: 800; font-size: 0.95rem; color: var(--accent-indigo); text-transform: uppercase; letter-spacing: 0.05em; display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255, 255, 255, 0.05); padding-bottom: 4px;";
+    dayHeader.innerHTML = `
+      <span>📅 ${getDayLabel(block)} — ${block.date}</span>
+      <span style="color: var(--text-secondary); font-size: 0.8rem;">${block.hoursScheduled} / ${dailyHoursBudget} hrs</span>
+    `;
+    timelineList.appendChild(dayHeader);
+
+    block.tasks.forEach(task => {
+      const itemDiv = document.createElement("div");
+      itemDiv.className = "timeline-item";
+      itemDiv.style = "margin-bottom: 12px;";
+
+      // Determine priority badge styles
+      let prioBg = "rgba(148, 163, 184, 0.1)";
+      let prioBorder = "rgba(148, 163, 184, 0.25)";
+      let prioColor = "#94a3b8";
+      if (task.priority === "High") {
+        prioBg = "rgba(239, 68, 68, 0.15)";
+        prioBorder = "rgba(239, 68, 68, 0.35)";
+        prioColor = "#f87171";
+      } else if (task.priority === "Medium") {
+        prioBg = "rgba(245, 158, 11, 0.15)";
+        prioBorder = "rgba(245, 158, 11, 0.35)";
+        prioColor = "#fbbf24";
+      }
+
+      // Check if task is overdue
+      const isOverdue = new Date(task.deadline) < new Date(new Date().setHours(0,0,0,0));
+      const overdueBadge = isOverdue ? `<span style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 4px; padding: 1px 6px; font-size: 0.72rem; font-weight: 700; margin-left: 6px; display: inline-flex; align-items: center; gap: 3px;">⚠️ Overdue</span>` : '';
+
+      // Check if task is split
+      const splitBadge = task.isSplit ? `<span style="background: rgba(99, 102, 241, 0.15); color: #818cf8; border: 1px solid rgba(99, 102, 241, 0.3); border-radius: 4px; padding: 1px 6px; font-size: 0.72rem; font-weight: 700; margin-left: 6px;">Split: ${task.segment || 'Part 1'}</span>` : '';
+
+      // Missed count alert
+      const missedBadge = task.missedCount > 0 ? `<span style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px dashed rgba(239, 68, 68, 0.35); border-radius: 4px; padding: 1px 6px; font-size: 0.72rem; font-weight: 700; margin-left: 6px;">⚠️ Missed x${task.missedCount}</span>` : '';
+
+      itemDiv.innerHTML = `
+        <div class="timeline-card" style="display:flex; flex-direction:column; padding: 14px; gap: 8px;">
+          <div style="display: flex; align-items: flex-start; justify-content: space-between; width: 100%;">
+            <div style="display: flex; align-items: center; gap: 10px; flex: 1;">
+              <div class="timeline-checkbox" onclick="toggleTaskById(${task.id})" style="flex-shrink:0; cursor:pointer;"></div>
+              <span class="timeline-task-text" style="font-weight: 600; font-size: 0.95rem; color: var(--text-primary);">
+                ${task.title}
+                ${task.tag ? `<span class="tag-badge" style="margin-left: 6px;">${task.tag}</span>` : ''}
+                ${splitBadge}
+                ${overdueBadge}
+                ${missedBadge}
+              </span>
+            </div>
+            
+            <div class="timeline-actions" style="display: flex; gap: 6px; align-items: center;">
+              <button class="timeline-btn reschedule-btn" onclick="markTaskMissed(${task.id})" title="Mark as Missed" style="font-size: 0.82rem; padding: 4px 8px; border-radius: 6px; background: rgba(255,255,255,0.04); border: 1px solid var(--glass-border); color: #fbbf24; cursor:pointer;">⚠️ Missed</button>
+              <button class="timeline-btn delete-btn" onclick="deleteTaskById(${task.id})" title="Delete Task" style="font-size: 0.82rem; padding: 4px 6px; border-radius: 6px; background: rgba(255,255,255,0.04); border: 1px solid var(--glass-border); color: var(--danger-color); cursor:pointer;">❌</button>
+            </div>
+          </div>
+
+          <!-- Metadata Row -->
+          <div style="display: flex; flex-wrap: wrap; gap: 12px; font-size: 0.78rem; font-weight: 600; color: var(--text-secondary); border-top: 1px solid rgba(255,255,255,0.03); padding-top: 8px; align-items: center;">
+            <span style="background: ${prioBg}; border: 1px solid ${prioBorder}; color: ${prioColor}; border-radius: 6px; padding: 2px 8px; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 800;">${task.priority}</span>
+            <span>⏳ ${task.hoursScheduled} ${task.hoursScheduled === 1 ? 'hr' : 'hrs'}</span>
+            <span>📅 Due: ${task.deadline}</span>
+            <span style="color: var(--accent-mint);">🔥 Urgency: ${task.urgencyScore}</span>
+          </div>
+        </div>
+      `;
+      timelineList.appendChild(itemDiv);
+    });
   });
 
-  if (sortedTasks.length === 0) {
-    timelineList.innerHTML = `<div style="color:var(--text-secondary); text-align:center; padding: 20px; font-style:italic; font-size:0.95rem;">No tasks scheduled under '${activeFilter}'. Add topics above!</div>`;
-  } else {
-    sortedTasks.forEach((task) => {
-      const slotIndex = taskSlotsMap[task.id] !== undefined ? taskSlotsMap[task.id] : 0;
-      const slotTime = timelineSlots[slotIndex];
-      
+  // Render Completed Tasks Section
+  if (completedTasks.length > 0) {
+    const completedHeader = document.createElement("div");
+    completedHeader.className = "day-header";
+    completedHeader.style = "margin-top: 30px; margin-bottom: 10px; font-weight: 800; font-size: 0.95rem; color: var(--accent-mint); text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid rgba(255, 255, 255, 0.05); padding-bottom: 4px;";
+    completedHeader.innerText = `✅ Completed Topics (${completedTasks.length})`;
+    timelineList.appendChild(completedHeader);
+
+    completedTasks.forEach(task => {
       const itemDiv = document.createElement("div");
-      itemDiv.className = `timeline-item ${task.completed ? 'completed' : ''}`;
+      itemDiv.className = "timeline-item completed";
+      itemDiv.style = "margin-bottom: 12px; opacity: 0.65;";
       itemDiv.innerHTML = `
-        <div class="timeline-time ${task.completed ? 'completed' : ''}">
-          🕒 ${slotTime}
-        </div>
-        <div class="timeline-card ${task.completed ? 'completed' : ''}">
-          <div class="timeline-card-content">
-            <div class="timeline-checkbox ${task.completed ? 'checked' : ''}" onclick="toggleTaskById(${task.id})">
-              ${task.completed ? '✓' : ''}
-            </div>
-            <span class="timeline-task-text ${task.completed ? 'completed' : ''}">
+        <div class="timeline-card completed" style="display:flex; align-items: center; justify-content: space-between; padding: 12px 14px;">
+          <div style="display: flex; align-items: center; gap: 10px; flex: 1;">
+            <div class="timeline-checkbox checked" onclick="toggleTaskById(${task.id})" style="flex-shrink:0; cursor:pointer;">✓</div>
+            <span class="timeline-task-text completed" style="text-decoration: line-through; color: var(--text-secondary); font-size: 0.95rem;">
               ${task.text}
-              ${task.tag ? `<span class="tag-badge">${task.tag}</span>` : ''}
+              ${task.tag ? `<span class="tag-badge" style="opacity: 0.5;">${task.tag}</span>` : ''}
             </span>
           </div>
           <div class="timeline-actions">
-            <button class="timeline-btn reschedule-btn" onclick="rescheduleTask(${task.id})" title="Reschedule slot">🔄</button>
-            <button class="timeline-btn delete-btn" onclick="deleteTaskById(${task.id})" title="Delete Task">❌</button>
+            <button class="timeline-btn delete-btn" onclick="deleteTaskById(${task.id})" title="Delete Task" style="font-size: 0.82rem; padding: 4px 6px; border-radius: 6px; background: rgba(255,255,255,0.04); border: 1px solid var(--glass-border); color: var(--danger-color); cursor:pointer;">❌</button>
           </div>
         </div>
       `;
@@ -366,7 +558,10 @@ function renderTasks() {
     });
   }
 
-  // Update layout and statistics
+  updateVisuals();
+}
+
+function updateVisuals() {
   if (typeof updateChart === 'function') {
     updateChart();
   }
@@ -378,30 +573,70 @@ function renderTasks() {
 async function addTask() {
   const input = document.getElementById("taskInput");
   const tagInput = document.getElementById("taskTagInput");
+  const priorityInput = document.getElementById("taskPriorityInput");
+  const durationInput = document.getElementById("taskDurationInput");
+  const deadlineInput = document.getElementById("taskDeadlineInput");
+
   const taskText = input.value.trim();
   const taskTag = tagInput ? tagInput.value.trim() : "";
+  const taskPriority = priorityInput ? priorityInput.value : "Medium";
+  const taskDuration = durationInput ? parseFloat(durationInput.value) : 1.0;
+  
+  let taskDeadline = deadlineInput ? deadlineInput.value : "";
+  if (!taskDeadline) {
+      const d = new Date();
+      d.setDate(d.getDate() + 3);
+      taskDeadline = d.toISOString().split('T')[0];
+  }
+
   if (taskText === "") return;
   
   try {
       const res = await fetch('/api/tasks', {
           method: 'POST',
           headers: getAuthHeaders(),
-          body: JSON.stringify({ text: taskText, completed: false, tag: taskTag })
+          body: JSON.stringify({ 
+              text: taskText, 
+              completed: false, 
+              tag: taskTag,
+              priority: taskPriority,
+              deadline: taskDeadline,
+              duration_hours: taskDuration
+          })
       });
       if (res.ok) {
           const newTask = await res.json();
-          // Assign next available slot to new task
-          const nextSlotIndex = tasks.length % timelineSlots.length;
-          taskSlotsMap[newTask.id] = nextSlotIndex;
-          localStorage.setItem('taskSlots', JSON.stringify(taskSlotsMap));
-          
           tasks.push(newTask);
           renderTasks();
+          
           input.value = "";
           if (tagInput) tagInput.value = "";
+          if (priorityInput) priorityInput.value = "Medium";
+          if (durationInput) durationInput.value = "1.0";
+          if (deadlineInput) deadlineInput.value = "";
       }
   } catch(err) { console.error(err); }
 }
+
+async function markTaskMissed(id) {
+  const task = tasks.find(t => t.id === id);
+  if (!task) return;
+  const currentMissedCount = task.missedCount || 0;
+  const newMissedCount = currentMissedCount + 1;
+  
+  task.missedCount = newMissedCount;
+  renderTasks();
+  
+  try {
+      await fetch(`/api/tasks/${id}`, {
+          method: 'PUT',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({ missedCount: newMissedCount })
+      });
+  } catch(err) { console.error(err); }
+}
+window.markTaskMissed = markTaskMissed;
+window.addTask = addTask;
 
 async function toggleTaskById(id) {
   const task = tasks.find(t => t.id === id);
