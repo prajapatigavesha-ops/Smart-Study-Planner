@@ -7,6 +7,10 @@ const path = require('path');
 require('dotenv').config();
 const nodemailer = require('nodemailer');
 const { OpenAI } = require('openai');
+const dns = require('dns');
+
+// Force Node.js to prefer IPv4 DNS resolution (avoids IPv6 ENETUNREACH errors on Render/VPS hosters)
+dns.setDefaultResultOrder('ipv4first');
 
 const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY || 'dummy_key'
