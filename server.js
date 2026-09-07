@@ -7,6 +7,7 @@ const path = require('path');
 require('dotenv').config();
 const nodemailer = require('nodemailer');
 const { OpenAI } = require('openai');
+const { GoogleGenAI, Type } = require('@google/genai');
 const dns = require('dns');
 
 // Force Node.js to prefer IPv4 DNS resolution (avoids IPv6 ENETUNREACH errors on Render/VPS hosters)
@@ -16,14 +17,34 @@ const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY || 'dummy_key'
 });
 
+const ai = new GoogleGenAI({
+    apiKey: process.env.GEMINI_API_KEY || 'dummy_key'
+});
+
 // Setup Nodemailer transporter
 const transporter = nodemailer.createTransport({
+    pool: true, // Enable pooling to reuse connections
+    maxConnections: 5,
+    maxMessages: 100,
     host: process.env.SMTP_HOST || 'smtp.gmail.com',
     port: parseInt(process.env.SMTP_PORT || '587'),
+    family: 4,
     secure: process.env.SMTP_SECURE === 'true',
     auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS
+    },
+    tls: {
+        rejectUnauthorized: false // Bypass self-signed certificate chain errors in TLS
+    }
+});
+
+// Verify SMTP connection on startup
+transporter.verify((error, success) => {
+    if (error) {
+        console.warn("⚠️ SMTP Transporter configuration error:", error.message);
+    } else {
+        console.log("✅ SMTP Transporter is ready to send emails.");
     }
 });
 
@@ -70,10 +91,10 @@ class HybridDatabase {
             completed BOOLEAN,
             tag VARCHAR(255)
         )`);
-        this.pool.query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS priority VARCHAR(50) DEFAULT 'Medium'`, (err) => {});
-        this.pool.query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS deadline VARCHAR(50)`, (err) => {});
-        this.pool.query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS duration_hours DOUBLE PRECISION DEFAULT 1.0`, (err) => {});
-        this.pool.query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS "missedCount" INTEGER DEFAULT 0`, (err) => {});
+        this.pool.query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS priority VARCHAR(50) DEFAULT 'Medium'`, (err) => { });
+        this.pool.query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS deadline VARCHAR(50)`, (err) => { });
+        this.pool.query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS duration_hours DOUBLE PRECISION DEFAULT 1.0`, (err) => { });
+        this.pool.query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS "missedCount" INTEGER DEFAULT 0`, (err) => { });
         this.pool.query(`CREATE TABLE IF NOT EXISTS stats (
             userId INTEGER PRIMARY KEY,
             totalStudyTime INTEGER DEFAULT 0,
@@ -95,7 +116,7 @@ class HybridDatabase {
             expiresAt TIMESTAMP
         )`);
     }
- 
+
     initSqlite() {
         this.sqliteDb.serialize(() => {
             this.sqliteDb.run(`CREATE TABLE IF NOT EXISTS users (
@@ -109,11 +130,11 @@ class HybridDatabase {
                 text TEXT,
                 completed BOOLEAN
             )`);
-            this.sqliteDb.run(`ALTER TABLE tasks ADD COLUMN tag TEXT`, (err) => {});
-            this.sqliteDb.run(`ALTER TABLE tasks ADD COLUMN priority TEXT DEFAULT 'Medium'`, (err) => {});
-            this.sqliteDb.run(`ALTER TABLE tasks ADD COLUMN deadline TEXT`, (err) => {});
-            this.sqliteDb.run(`ALTER TABLE tasks ADD COLUMN duration_hours REAL DEFAULT 1.0`, (err) => {});
-            this.sqliteDb.run(`ALTER TABLE tasks ADD COLUMN missedCount INTEGER DEFAULT 0`, (err) => {});
+            this.sqliteDb.run(`ALTER TABLE tasks ADD COLUMN tag TEXT`, (err) => { });
+            this.sqliteDb.run(`ALTER TABLE tasks ADD COLUMN priority TEXT DEFAULT 'Medium'`, (err) => { });
+            this.sqliteDb.run(`ALTER TABLE tasks ADD COLUMN deadline TEXT`, (err) => { });
+            this.sqliteDb.run(`ALTER TABLE tasks ADD COLUMN duration_hours REAL DEFAULT 1.0`, (err) => { });
+            this.sqliteDb.run(`ALTER TABLE tasks ADD COLUMN missedCount INTEGER DEFAULT 0`, (err) => { });
             this.sqliteDb.run(`CREATE TABLE IF NOT EXISTS stats (
                 userId INTEGER PRIMARY KEY,
                 totalStudyTime INTEGER DEFAULT 0,
@@ -217,7 +238,7 @@ const db = new HybridDatabase();
 function authenticateToken(req, res, next) {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
-    
+
     if (token == null) return res.sendStatus(401);
 
     jwt.verify(token, SECRET_KEY, (err, user) => {
@@ -232,7 +253,7 @@ function authenticateToken(req, res, next) {
 app.post('/auth/send-otp', (req, res) => {
     const { email } = req.body;
     if (!email) return res.status(400).json({ error: "Email is required" });
-    
+
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
         return res.status(400).json({ error: "Invalid email format" });
@@ -268,25 +289,28 @@ app.post('/auth/send-otp', (req, res) => {
                     `
                 };
 
+                // Send mail in the background (asynchronously) without blocking the response
                 transporter.sendMail(mailOptions, (mailErr, info) => {
                     if (mailErr) {
-                        console.error("Mail Send Error:", mailErr.message);
-                        if (process.env.NODE_ENV !== 'production') {
-                            return res.status(200).json({ 
-                                message: "OTP generated (dev mode fallback)", 
-                                _dev_otp: otp,
-                                warning: "SMTP failed: " + mailErr.message
-                            });
-                        }
-                        return res.status(500).json({ error: "Failed to send OTP email: " + mailErr.message });
+                        console.error("❌ Background Mail Send Error:", mailErr.message);
+                    } else {
+                        console.log(`📧 OTP successfully sent in the background to ${email}: ${info.response}`);
                     }
-                    res.json({ message: "OTP sent successfully to your email." });
                 });
+
+                // Respond immediately
+                const responseData = { message: "OTP sent successfully to your email." };
+                if (process.env.NODE_ENV !== 'production') {
+                    responseData._dev_otp = otp;
+                    responseData.smtp_active = true;
+                }
+                res.json(responseData);
             } else {
                 console.log(`[OTP DEBUG] OTP for ${email} is: ${otp}`);
-                res.json({ 
-                    message: "OTP generated successfully (Development Mode)", 
-                    _dev_otp: otp 
+                res.json({
+                    message: "OTP generated successfully (Development Mode)",
+                    _dev_otp: otp,
+                    smtp_active: false
                 });
             }
         });
@@ -315,9 +339,9 @@ app.post('/auth/verify-otp', (req, res) => {
             if (userErr) return res.status(500).json({ error: userErr.message });
 
             if (!user) {
-                db.run(`INSERT INTO users (username, password) VALUES (?, ?)`, [email, 'passwordless'], function(createErr) {
+                db.run(`INSERT INTO users (username, password) VALUES (?, ?)`, [email, 'passwordless'], function (createErr) {
                     if (createErr) return res.status(500).json({ error: "Failed to register user" });
-                    
+
                     const userId = this.lastID;
                     db.run(`INSERT INTO stats (userId, totalStudyTime, sessionsCompleted) VALUES (?, 0, 0)`, [userId], (statsErr) => {
                         const token = jwt.sign({ id: userId, username: email }, SECRET_KEY);
@@ -335,21 +359,21 @@ app.post('/auth/verify-otp', (req, res) => {
 app.post('/auth/signup', async (req, res) => {
     const { username, password } = req.body;
     if (!username || !password) return res.status(400).json({ error: "Username and password required" });
-    
+
     try {
         const hashedPassword = await bcrypt.hash(password, 10);
-        db.run(`INSERT INTO users (username, password) VALUES (?, ?)`, [username, hashedPassword], function(err) {
+        db.run(`INSERT INTO users (username, password) VALUES (?, ?)`, [username, hashedPassword], function (err) {
             if (err) {
                 if (err.message.includes('UNIQUE')) {
                     return res.status(400).json({ error: "Username already exists" });
                 }
                 return res.status(500).json({ error: err.message });
             }
-            
+
             const userId = this.lastID;
             // Initialize stats for new user
             db.run(`INSERT INTO stats (userId, totalStudyTime, sessionsCompleted) VALUES (?, 0, 0)`, [userId]);
-            
+
             res.status(201).json({ message: "User created successfully", userId });
         });
     } catch (e) {
@@ -362,7 +386,7 @@ app.post('/auth/login', (req, res) => {
     db.get(`SELECT * FROM users WHERE username = ?`, [username], async (err, user) => {
         if (err) return res.status(500).json({ error: err.message });
         if (!user) return res.status(400).json({ error: "User not found" });
-        
+
         try {
             if (await bcrypt.compare(password, user.password)) {
                 // Include id in token so we know which user requests belong to
@@ -405,11 +429,11 @@ app.post('/api/tasks', authenticateToken, (req, res) => {
     const defaultDeadline = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     const taskDeadline = deadline || defaultDeadline;
     const taskDuration = Number(duration_hours || 1.0);
-    
+
     db.run(
         `INSERT INTO tasks (userId, text, completed, tag, priority, deadline, duration_hours, missedCount) VALUES (?, ?, ?, ?, ?, ?, ?, 0)`,
         [req.user.id, text, isCompleted, taskTag, taskPriority, taskDeadline, taskDuration],
-        function(err) {
+        function (err) {
             if (err) return res.status(500).json({ error: err.message });
             res.status(201).json({
                 id: this.lastID,
@@ -428,10 +452,10 @@ app.post('/api/tasks', authenticateToken, (req, res) => {
 // Update a task (flexible update support for completed, missedCount, text, tag, priority, deadline, duration_hours)
 app.put('/api/tasks/:id', authenticateToken, (req, res) => {
     const { completed, missedCount, text, tag, priority, deadline, duration_hours } = req.body;
-    
+
     let updates = [];
     let params = [];
-    
+
     if (completed !== undefined) {
         updates.push("completed = ?");
         params.push(completed ? 1 : 0);
@@ -460,15 +484,15 @@ app.put('/api/tasks/:id', authenticateToken, (req, res) => {
         updates.push("duration_hours = ?");
         params.push(Number(duration_hours));
     }
-    
+
     if (updates.length === 0) {
         return res.status(400).json({ error: "No fields to update" });
     }
-    
+
     const query = `UPDATE tasks SET ${updates.join(', ')} WHERE id = ? AND userId = ?`;
     params.push(req.params.id, req.user.id);
-    
-    db.run(query, params, function(err) {
+
+    db.run(query, params, function (err) {
         if (err) return res.status(500).json({ error: err.message });
         if (this.changes === 0) return res.status(404).json({ error: "Task not found" });
         res.json({ message: "Task updated successfully" });
@@ -477,7 +501,7 @@ app.put('/api/tasks/:id', authenticateToken, (req, res) => {
 
 // Delete a task
 app.delete('/api/tasks/:id', authenticateToken, (req, res) => {
-    db.run(`DELETE FROM tasks WHERE id = ? AND userId = ?`, [req.params.id, req.user.id], function(err) {
+    db.run(`DELETE FROM tasks WHERE id = ? AND userId = ?`, [req.params.id, req.user.id], function (err) {
         if (err) return res.status(500).json({ error: err.message });
         if (this.changes === 0) return res.status(404).json({ error: "Task not found" });
         res.json({ message: "Task deleted" });
@@ -501,22 +525,22 @@ app.put('/api/stats', authenticateToken, (req, res) => {
     db.run(
         `UPDATE stats SET totalStudyTime = ?, sessionsCompleted = ? WHERE userId = ?`,
         [totalStudyTime, sessionsCompleted, req.user.id],
-        function(err) {
+        function (err) {
             if (err) return res.status(500).json({ error: err.message });
             if (this.changes === 0) {
                 db.run(`INSERT INTO stats (userId, totalStudyTime, sessionsCompleted) VALUES (?, ?, ?)`,
-                [req.user.id, totalStudyTime, sessionsCompleted]);
+                    [req.user.id, totalStudyTime, sessionsCompleted]);
             }
             res.json({ message: "Stats updated" });
         }
     );
 });
 
-// --- AI Chat Endpoint ---
+// --- AI Chat Endpoint (FIXED) ---
 app.post('/api/chat', (req, res, next) => {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
-    
+
     if (token) {
         jwt.verify(token, SECRET_KEY, (err, user) => {
             if (err) return res.sendStatus(403);
@@ -528,47 +552,139 @@ app.post('/api/chat', (req, res, next) => {
         next();
     }
 }, async (req, res) => {
-    const { message } = req.body;
-    
-    if (process.env.OPENAI_API_KEY && (process.env.OPENAI_API_KEY.startsWith('sk-') || process.env.OPENAI_API_KEY.startsWith('proj-'))) {
+    // 'history' is now expected from the frontend: an array of
+    // { role: 'user' | 'model', text: string } from the current chat session
+    const { message, userState, history } = req.body;
+
+    // 1. FIXED SYSTEM PROMPT — now explicitly a tutor, not just a cheerleader
+    let systemInstruction = `You are Nova, an AI study buddy for a student using a spaced-repetition study app.
+Your two jobs, in priority order:
+1. Answer the student's academic questions clearly and correctly. Explain concepts in simple terms,
+   use short examples or analogies, and check if they want more detail before going deeper.
+2. When relevant, connect your answer back to their study progress (streak, overdue topics) to keep them motivated.
+
+Rules:
+- If the student asks a subject/doubt-clearing question, answer it directly and substantively first.
+  Do not deflect to generic encouragement instead of answering.
+- Keep answers focused — a few sentences or a short list, not an essay, unless they ask for depth.
+- If you don't know something for certain, say so rather than guessing.`;
+
+    if (userState) {
+        systemInstruction += `\n\nStudent Current Study State (for context, not the main topic unless asked):
+- Study Streak: ${userState.streak} days.
+- Total Topics: ${userState.totalTopics}.
+- Mastered Topics: ${userState.masteredTopics} / ${userState.totalTopics}.
+- Overdue Review Sessions: ${userState.overdueCount}.
+- Overdue Topics List: ${userState.overdueList.join(', ') || 'None'}.`;
+    }
+
+    const hasGeminiKey = process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'dummy_key';
+    const hasOpenAIKey = process.env.OPENAI_API_KEY && (process.env.OPENAI_API_KEY.startsWith('sk-') || process.env.OPENAI_API_KEY.startsWith('proj-'));
+
+    // 2. FIXED — build real conversation history instead of sending message alone
+    // Gemini expects: [{ role: 'user'|'model', parts: [{ text }] }, ...]
+    function buildGeminiContents(history, message) {
+        const contents = (history || []).map(turn => ({
+            role: turn.role === 'assistant' || turn.role === 'model' ? 'model' : 'user',
+            parts: [{ text: turn.text }]
+        }));
+        contents.push({ role: 'user', parts: [{ text: message }] });
+        return contents;
+    }
+
+    // OpenAI expects: [{ role: 'system'|'user'|'assistant', content }, ...]
+    function buildOpenAIMessages(history, message, systemInstruction) {
+        const messages = [{ role: 'system', content: systemInstruction }];
+        (history || []).forEach(turn => {
+            messages.push({
+                role: turn.role === 'assistant' || turn.role === 'model' ? 'assistant' : 'user',
+                content: turn.text
+            });
+        });
+        messages.push({ role: 'user', content: message });
+        return messages;
+    }
+
+    if (hasGeminiKey) {
+        try {
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: buildGeminiContents(history, message),
+                config: {
+                    systemInstruction: systemInstruction
+                }
+            });
+            return res.json({ reply: response.text });
+        } catch (err) {
+            console.error("Gemini Chat API Error:", err.message);
+            if (hasOpenAIKey) {
+                try {
+                    const completion = await openai.chat.completions.create({
+                        messages: buildOpenAIMessages(history, message, systemInstruction),
+                        model: "gpt-3.5-turbo",
+                    });
+                    return res.json({ reply: completion.choices[0].message.content, warning: "Gemini failed, used OpenAI fallback." });
+                } catch (err2) {
+                    console.error("OpenAI fallback also failed:", err2.message);
+                }
+            }
+            const reply = getSimulatedNovaReply(message, userState);
+            return res.json({ reply, warning: "AI providers unavailable. Using local simulated chat — answers will be limited." });
+        }
+    } else if (hasOpenAIKey) {
         try {
             const completion = await openai.chat.completions.create({
-                messages: [
-                    { role: "system", content: "You are an expert academic AI tutor designed for students. Your role is to suggest study content, recommend resources, explain complex topics, and provide actionable study plans to help students excel." },
-                    { role: "user", content: message }
-                ],
+                messages: buildOpenAIMessages(history, message, systemInstruction),
                 model: "gpt-3.5-turbo",
             });
-            res.json({ reply: completion.choices[0].message.content });
+            return res.json({ reply: completion.choices[0].message.content });
         } catch (err) {
-            console.error("OpenAI Error:", err.message);
-            
-            // Graceful Fallback to Simulated AI
-            const lowerMsg = message.toLowerCase();
-            let reply = `(Simulated AI) I temporarily stepped in because your API key hit a billing error: ${err.message}. Keep up the great work studying!`;
-            if (lowerMsg.includes('hello') || lowerMsg.includes('hi')) {
-                reply = "(Simulated AI) Hello there! I'm here because your API key hit its quota limit. How can I help?";
-            } else if (lowerMsg.includes('plan') || lowerMsg.includes('schedule')) {
-                reply = "(Simulated AI) Try breaking your tasks into 25-minute Pomodoro sessions!";
-            }
-            res.json({ reply });
+            console.error("OpenAI Chat Error:", err.message);
+            const reply = getSimulatedNovaReply(message, userState);
+            return res.json({ reply, warning: "OpenAI call failed. Using local simulated chat." });
         }
     } else {
-        const lowerMsg = message.toLowerCase();
-        let reply = "I am your simulated AI Assistant! Provide a real OpenAI API key via .env to unlock actual intelligence. You are doing great!";
-        if (lowerMsg.includes('hello') || lowerMsg.includes('hi')) {
-            reply = "Hello there! How can I help you plan your studies today?";
-        } else if (lowerMsg.includes('plan') || lowerMsg.includes('schedule')) {
-            reply = "I suggest breaking your study sessions into 25-minute Pomodoro blocks. Add a task on the left and let's get started!";
-        } else if (lowerMsg.includes('tired') || lowerMsg.includes('exhausted')) {
-            reply = "Take a short break! Your brain needs time to consolidate information. You've got this.";
-        }
-        
+        // No API key configured at all — this is the actual root cause if you haven't
+        // set GEMINI_API_KEY / OPENAI_API_KEY as real values in Render's environment variables.
+        const reply = getSimulatedNovaReply(message, userState);
         setTimeout(() => {
-            res.json({ reply });
+            res.json({ reply, warning: "No AI API key configured — Nova cannot answer real questions until GEMINI_API_KEY or OPENAI_API_KEY is set." });
         }, 800);
     }
 });
+
+function getSimulatedNovaReply(message, userState) {
+    const lowerMsg = message.toLowerCase();
+    let reply = "Hey! I'm Nova, your AI study buddy. (Simulated Mode) Keep up the great work studying!";
+
+    let streakText = "";
+    let overdueText = "";
+    if (userState) {
+        if (userState.streak > 0) {
+            streakText = ` You are on an awesome 🔥 ${userState.streak}-day study streak!`;
+        } else {
+            streakText = ` Let's get a study streak started today!`;
+        }
+
+        if (userState.overdueCount > 0) {
+            overdueText = ` I noticed you have ${userState.overdueCount} overdue reviews in your calendar (specifically on: ${userState.overdueList.slice(0, 2).join(', ')}). We should tackle them next!`;
+        } else {
+            overdueText = ` Your spaced repetition calendar looks clean and caught up. Great job!`;
+        }
+    }
+
+    if (lowerMsg.includes('hello') || lowerMsg.includes('hi')) {
+        reply = `Hey there! Nova here.${streakText}${overdueText} How can I help you study today?`;
+    } else if (lowerMsg.includes('plan') || lowerMsg.includes('schedule')) {
+        reply = `To help with your schedule, I suggest breaking your sessions into 25-minute Pomodoro blocks. Also, be sure to check off your reviews: ${overdueText}`;
+    } else if (lowerMsg.includes('tired') || lowerMsg.includes('exhausted')) {
+        reply = `Your brain needs rest to lock in your study sessions. Take a 5-10 minute stretch break, then come back!`;
+    } else if (userState && userState.overdueCount > 0) {
+        reply = `I'm here to support you! Since you have ${userState.overdueCount} pending reviews, let's focus on finishing them so you don't break your ${userState.streak}-day streak!`;
+    }
+
+    return reply;
+}
 
 // --- AI Quiz Master Endpoint ---
 app.post('/api/quiz/generate', authenticateToken, async (req, res) => {
@@ -686,30 +802,285 @@ function generateMockQuiz(topic) {
     };
 }
 
+// --- AI Feynman Evaluator Routes ---
+
+// POST /api/feynman/evaluate
+app.post('/api/feynman/evaluate', authenticateToken, async (req, res) => {
+    const { topic, explanation } = req.body;
+
+    if (!topic || !explanation) {
+        return res.status(400).json({
+            success: false,
+            error: 'Both topic and explanation are required.'
+        });
+    }
+
+    const hasGeminiKey = process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'dummy_key';
+
+    if (hasGeminiKey) {
+        try {
+            const prompt = `Topic being explained: "${topic}"\nStudent Explanation: "${explanation}"`;
+
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: prompt,
+                config: {
+                    systemInstruction: `You are an expert Feynman Technique evaluator. Your job is to check whether a student has explained a complex concept in simple, layman's terms.
+1. Assign a clarity score (0-100%).
+2. Highlight any complex technical jargon used that wasn't simplified.
+3. Point out any logical gaps or key missing details.
+4. Suggest a clear, intuitive real-world analogy.`,
+                    responseMimeType: 'application/json',
+                    responseSchema: {
+                        type: Type.OBJECT,
+                        properties: {
+                            clarity_score: { type: Type.INTEGER },
+                            jargon_spotted: { type: Type.STRING },
+                            logical_gaps: { type: Type.STRING },
+                            recommended_analogy: { type: Type.STRING }
+                        },
+                        required: ['clarity_score', 'jargon_spotted', 'logical_gaps', 'recommended_analogy']
+                    }
+                }
+            });
+
+            const reportData = JSON.parse(response.text);
+
+            return res.json({
+                success: true,
+                report: reportData
+            });
+        } catch (error) {
+            console.error('Feynman Evaluation API Error:', error.message);
+            const fallbackReport = generateMockFeynmanEvaluation(topic, explanation);
+            return res.json({
+                success: true,
+                report: fallbackReport,
+                warning: 'Gemini API call failed. Using local fallback evaluator.'
+            });
+        }
+    } else {
+        const fallbackReport = generateMockFeynmanEvaluation(topic, explanation);
+        setTimeout(() => {
+            return res.json({
+                success: true,
+                report: fallbackReport,
+                info: 'Offline mode: local fallback evaluator used.'
+            });
+        }, 1200);
+    }
+});
+
+function generateMockFeynmanEvaluation(topic, explanation) {
+    const words = explanation.split(/\s+/).length;
+    let score = Math.floor(Math.random() * 15) + 70;
+    if (words > 40) score += 10;
+    if (words > 80) score += 5;
+    score = Math.min(98, score);
+
+    let jargon = "Detected academic expressions. Try describing it in simpler terms.";
+    let gaps = "Missing some fundamental details. Expand on how " + topic + " works step-by-step.";
+    let analogy = "Think of it like a train: the engine leads, the passenger cars follow, and the tracks keep it guided.";
+
+    const lowerTopic = topic.toLowerCase();
+    const lowerExpl = explanation.toLowerCase();
+
+    if (lowerTopic.includes('biol') || lowerTopic.includes('photo') || lowerTopic.includes('cell')) {
+        jargon = "Thylakoid, photophosphorylation, Calvin Cycle. Try swapping these for 'solar collectors' or 'sugar production assembly line'.";
+        gaps = "Explain clearly *where* the water and carbon dioxide enter the leaf structure, and why oxygen is released as a byproduct.";
+        analogy = "Think of a leaf as a tiny solar-powered kitchen: sunlight is the power stove, water and CO2 are ingredients, and glucose is the freshly baked cake.";
+    } else if (lowerTopic.includes('hist') || lowerTopic.includes('soc') || lowerTopic.includes('revol')) {
+        jargon = "Estates-General, Bourgeoisie, Reign of Terror. Try describing these as 'the king's assembly' or 'middle-class merchants'.";
+        gaps = "Clarify the immediate economic trigger factors—such as the bread shortage and national debt—that pushed citizens to action.";
+        analogy = "Imagine three roommates where two of them eat all the food and throw parties, but force the third roommate to pay 100% of the rent.";
+    }
+
+    return {
+        clarity_score: score,
+        jargon_spotted: jargon,
+        logical_gaps: gaps,
+        recommended_analogy: analogy
+    };
+}
+
+// POST /api/schedule/generate
+app.post('/api/schedule/generate', authenticateToken, async (req, res) => {
+    const { syllabusText, startDate, targetExamDate } = req.body;
+
+    if (!syllabusText) {
+        return res.status(400).json({
+            success: false,
+            error: 'Syllabus text is required.'
+        });
+    }
+
+    const baseDate = startDate ? new Date(startDate) : new Date();
+    const formattedToday = baseDate.toISOString().split('T')[0];
+
+    const hasGeminiKey = process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'dummy_key';
+
+    if (hasGeminiKey) {
+        try {
+            const prompt = `Current Date: ${formattedToday}\nTarget Exam Date: ${targetExamDate || 'Not specified'}\n\nSyllabus Content:\n"""\n${syllabusText}\n"""`;
+
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: prompt,
+                config: {
+                    systemInstruction: `You are an expert academic study planner.
+1. Extract distinct, bite-sized study topics from the syllabus text.
+2. Estimate the difficulty level ('Easy', 'Medium', 'Hard') and estimated study duration in minutes for each topic.
+3. Calculate initial review dates using a spaced repetition model (1 day, 3 days, 7 days, and 30 days after the initial scheduled date).
+4. Order the topics logically so prerequisites come first.`,
+                    responseMimeType: 'application/json',
+                    responseSchema: {
+                        type: Type.OBJECT,
+                        properties: {
+                            course_summary: { type: Type.STRING },
+                            total_topics: { type: Type.INTEGER },
+                            topics: {
+                                type: Type.ARRAY,
+                                items: {
+                                    type: Type.OBJECT,
+                                    properties: {
+                                        topic_title: { type: Type.STRING },
+                                        unit_or_module: { type: Type.STRING },
+                                        difficulty: { type: Type.STRING },
+                                        estimated_minutes: { type: Type.INTEGER },
+                                        initial_study_date: { type: Type.STRING },
+                                        spaced_review_dates: {
+                                            type: Type.ARRAY,
+                                            items: { type: Type.STRING }
+                                        }
+                                    },
+                                    required: [
+                                        'topic_title',
+                                        'unit_or_module',
+                                        'difficulty',
+                                        'estimated_minutes',
+                                        'initial_study_date',
+                                        'spaced_review_dates'
+                                    ]
+                                }
+                            }
+                        },
+                        required: ['course_summary', 'total_topics', 'topics']
+                    }
+                }
+            });
+
+            const scheduleData = JSON.parse(response.text);
+
+            return res.json({
+                success: true,
+                schedule: scheduleData
+            });
+        } catch (error) {
+            console.error('Syllabus Schedule Generation API Error:', error.message);
+            const fallbackSchedule = generateMockSchedule(syllabusText, baseDate, targetExamDate);
+            return res.json({
+                success: true,
+                schedule: fallbackSchedule,
+                warning: 'Gemini schedule generation failed. Using local scheduler fallback.'
+            });
+        }
+    } else {
+        const fallbackSchedule = generateMockSchedule(syllabusText, baseDate, targetExamDate);
+        setTimeout(() => {
+            return res.json({
+                success: true,
+                schedule: fallbackSchedule,
+                info: 'Offline mode: local scheduler fallback used.'
+            });
+        }, 1500);
+    }
+});
+
+function generateMockSchedule(syllabusText, baseDate, targetExamDate) {
+    const lines = syllabusText.split('\n');
+    const topics = [];
+    let topicCount = 0;
+
+    for (let line of lines) {
+        line = line.trim();
+        if (line.length > 5 && line.length < 80 && topicCount < 10) {
+            const initialDate = new Date(baseDate.getTime());
+            initialDate.setDate(initialDate.getDate() + topicCount * 2);
+            const initialDateStr = initialDate.toISOString().split('T')[0];
+
+            const spacedDates = [1, 3, 7, 30].map(days => {
+                const d = new Date(initialDate.getTime());
+                d.setDate(d.getDate() + days);
+                return d.toISOString().split('T')[0];
+            });
+
+            topics.push({
+                topic_title: line,
+                unit_or_module: "Unit " + (Math.floor(topicCount / 3) + 1),
+                difficulty: ["Easy", "Medium", "Hard"][topicCount % 3],
+                estimated_minutes: [30, 45, 60, 90][topicCount % 4],
+                initial_study_date: initialDateStr,
+                spaced_review_dates: spacedDates
+            });
+            topicCount++;
+        }
+    }
+
+    if (topics.length === 0) {
+        const fallbacks = ["Foundational Concepts", "Core Implementations", "Advanced Techniques"];
+        fallbacks.forEach((title, index) => {
+            const initialDate = new Date(baseDate.getTime());
+            initialDate.setDate(initialDate.getDate() + index * 2);
+            const initialDateStr = initialDate.toISOString().split('T')[0];
+
+            const spacedDates = [1, 3, 7, 30].map(days => {
+                const d = new Date(initialDate.getTime());
+                d.setDate(d.getDate() + days);
+                return d.toISOString().split('T')[0];
+            });
+
+            topics.push({
+                topic_title: title,
+                unit_or_module: "Module 1",
+                difficulty: "Medium",
+                estimated_minutes: 45,
+                initial_study_date: initialDateStr,
+                spaced_review_dates: spacedDates
+            });
+        });
+    }
+
+    return {
+        course_summary: "Automated review schedule based on syllabus.",
+        total_topics: topics.length,
+        topics: topics
+    };
+}
+
 // --- AI Syllabus Manager Routes ---
 
 // 1. Upload syllabus file & parse topics
 app.post('/api/syllabi', authenticateToken, async (req, res) => {
     const { fileName, fileType, fileSize, fileData, extractedText } = req.body;
-    
+
     if (!fileName || !fileData) {
         return res.status(400).json({ error: "fileName and fileData are required." });
     }
-    
+
     db.run(
         `INSERT INTO syllabi (userId, fileName, fileType, fileSize, fileData) VALUES (?, ?, ?, ?, ?)`,
         [req.user.id, fileName, fileType || 'application/octet-stream', fileSize || 0, fileData],
-        async function(err) {
+        async function (err) {
             if (err) {
                 console.error("DB Save Syllabus Error:", err.message);
                 return res.status(500).json({ error: "Failed to save syllabus file to database." });
             }
-            
+
             const syllabusId = this.lastID;
-            
+
             if (extractedText && extractedText.trim()) {
                 const text = extractedText.trim();
-                
+
                 if (process.env.OPENAI_API_KEY && (process.env.OPENAI_API_KEY.startsWith('sk-') || process.env.OPENAI_API_KEY.startsWith('proj-'))) {
                     try {
                         const systemPrompt = `You are an expert academic coordinator and cognitive science assistant. Your task is to analyze the provided syllabus, lecture schedule, or course outline text and extract the core conceptual topics that a student needs to master.
@@ -742,12 +1113,12 @@ JSON Structure Expected:
                             model: "gpt-3.5-turbo",
                             temperature: 0.1
                         });
-                        
+
                         let replyText = completion.choices[0].message.content.trim();
                         if (replyText.startsWith('```')) {
                             replyText = replyText.replace(/^```(json)?\n?/, '').replace(/\n?```$/, '').trim();
                         }
-                        
+
                         const parsedData = JSON.parse(replyText);
                         return res.json({ id: syllabusId, parsed: parsedData });
                     } catch (aiErr) {
@@ -804,7 +1175,7 @@ app.delete('/api/syllabi/:id', authenticateToken, (req, res) => {
     db.run(
         `DELETE FROM syllabi WHERE id = ? AND userId = ?`,
         [req.params.id, req.user.id],
-        function(err) {
+        function (err) {
             if (err) {
                 console.error("DB Delete Syllabus Error:", err.message);
                 return res.status(500).json({ error: err.message });
@@ -823,7 +1194,7 @@ function localRegexSyllabusParserV2(text) {
     const topics = [];
     let currentSubject = "General Subject";
     let courseName = "General Syllabus Study Plan";
-    
+
     for (let i = 0; i < Math.min(lines.length, 6); i++) {
         const line = lines[i].trim();
         if (line.toLowerCase().includes('syllabus') || line.toLowerCase().includes('course') || line.toLowerCase().includes('class')) {
@@ -831,15 +1202,15 @@ function localRegexSyllabusParserV2(text) {
             break;
         }
     }
-    
+
     for (let line of lines) {
         line = line.trim();
         if (!line) continue;
-        
-        const subjectHeaderMatch = line.match(/^(?:Subject|Course|Class)\s*:\s*(.+)$/i) || 
-                                   line.match(/^#{1,4}\s+(.+)$/) ||
-                                   (line.length < 40 && line.endsWith(':') && !line.includes('http'));
-                                   
+
+        const subjectHeaderMatch = line.match(/^(?:Subject|Course|Class)\s*:\s*(.+)$/i) ||
+            line.match(/^#{1,4}\s+(.+)$/) ||
+            (line.length < 40 && line.endsWith(':') && !line.includes('http'));
+
         if (subjectHeaderMatch) {
             let candidate = typeof subjectHeaderMatch === 'string' ? subjectHeaderMatch : subjectHeaderMatch[1];
             candidate = candidate.replace(/^[#\s*]+|[:]+$/g, '').trim();
@@ -848,10 +1219,10 @@ function localRegexSyllabusParserV2(text) {
             }
             continue;
         }
-        
-        const bulletMatch = line.match(/^[\*\-\+•]\s+(.+)$/) || 
-                            line.match(/^\d+\.\s+(.+)$/);
-                            
+
+        const bulletMatch = line.match(/^[\*\-\+•]\s+(.+)$/) ||
+            line.match(/^\d+\.\s+(.+)$/);
+
         if (bulletMatch) {
             const topicText = bulletMatch[1].trim();
             if (topicText.length > 3 && topicText.length < 120 && !topicText.toLowerCase().includes('page ')) {
@@ -866,7 +1237,7 @@ function localRegexSyllabusParserV2(text) {
             }
         }
     }
-    
+
     if (topics.length === 0) {
         let count = 0;
         const diffs = ["Easy", "Medium", "Hard"];
@@ -883,7 +1254,7 @@ function localRegexSyllabusParserV2(text) {
             }
         }
     }
-    
+
     return {
         course_name: courseName,
         estimated_study_weeks: 12,

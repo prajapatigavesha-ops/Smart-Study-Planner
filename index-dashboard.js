@@ -6,6 +6,23 @@
 const token = localStorage.getItem('token');
 const isAuthenticated = !!token;
 
+// Helper to decode username from JWT token
+function getUsernameFromToken() {
+    if (!token) return 'Guest';
+    try {
+        const base64Url = token.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(window.atob(base64).split('').map(function(c) {
+            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        }).join(''));
+        return JSON.parse(jsonPayload).username || 'John Doe';
+    } catch (e) {
+        return 'John Doe';
+    }
+}
+
+const userPrefix = isAuthenticated ? getUsernameFromToken() + '_' : '';
+
 function getAuthHeaders() {
     return {
         'Content-Type': 'application/json',
@@ -87,21 +104,7 @@ function switchView(viewName) {
 }
 window.switchView = switchView;
 
-// Helper to decode username from JWT token
-function getUsernameFromToken() {
-    const t = localStorage.getItem('token');
-    if (!t) return 'Guest';
-    try {
-        const base64Url = t.split('.')[1];
-        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-        const jsonPayload = decodeURIComponent(window.atob(base64).split('').map(function(c) {
-            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-        }).join(''));
-        return JSON.parse(jsonPayload).username || 'John Doe';
-    } catch (e) {
-        return 'John Doe';
-    }
-}
+// Helper to decode username from JWT token (already declared above)
 
 // Toggle profile dropdown card
 function toggleProfileDropdown(event) {
@@ -266,7 +269,11 @@ function setupAuthNavbar() {
 }
 
 function logout() {
-    localStorage.removeItem('token');
+    const currentTheme = localStorage.getItem('theme');
+    localStorage.clear();
+    if (currentTheme) {
+        localStorage.setItem('theme', currentTheme);
+    }
     window.location.href = '/';
 }
 window.logout = logout;
@@ -292,8 +299,8 @@ async function loadTimerStats() {
 }
 
 function loadLocalStats() {
-    sessionsCompleted = parseInt(localStorage.getItem('sessionsCompleted')) || 0;
-    totalStudyTime = parseInt(localStorage.getItem('totalStudyTime')) || 0;
+    sessionsCompleted = parseInt(localStorage.getItem(userPrefix + 'sessionsCompleted')) || 0;
+    totalStudyTime = parseInt(localStorage.getItem(userPrefix + 'totalStudyTime')) || 0;
 }
 
 async function saveTimerStats() {
@@ -307,10 +314,10 @@ async function saveTimerStats() {
         } catch (err) {
             console.error("Failed to save stats to server:", err);
         }
-    } else {
-        localStorage.setItem('sessionsCompleted', sessionsCompleted.toString());
-        localStorage.setItem('totalStudyTime', totalStudyTime.toString());
     }
+    // Always cache locally under userPrefix
+    localStorage.setItem(userPrefix + 'sessionsCompleted', sessionsCompleted.toString());
+    localStorage.setItem(userPrefix + 'totalStudyTime', totalStudyTime.toString());
 }
 
 // --- Pomodoro Timer Functions ---
@@ -581,7 +588,7 @@ async function deleteTagCategory(tag, event) {
     // 1. Delete study topics with this tag or subject
     if (window.studyTopics) {
         window.studyTopics = window.studyTopics.filter(t => t.tag !== tag && t.subject !== tag);
-        localStorage.setItem('studyTopics', JSON.stringify(window.studyTopics));
+        localStorage.setItem(userPrefix + 'studyTopics', JSON.stringify(window.studyTopics));
     }
     
     // 2. Clear reviews from calendarStore
@@ -589,7 +596,7 @@ async function deleteTagCategory(tag, event) {
         const remainingTopics = window.studyTopics || [];
         const remainingTopicIds = new Set(remainingTopics.map(t => t.id));
         window.calendarStore = window.calendarStore.filter(evt => remainingTopicIds.has(evt.topicId));
-        localStorage.setItem('calendarStore', JSON.stringify(window.calendarStore));
+        localStorage.setItem(userPrefix + 'calendarStore', JSON.stringify(window.calendarStore));
     }
     
     // 3. Reset active filter if deleted
@@ -904,7 +911,7 @@ function finalizeMastery() {
             evt.status = 'completed';
         }
     });
-    localStorage.setItem('calendarStore', JSON.stringify(window.calendarStore));
+    localStorage.setItem(userPrefix + 'calendarStore', JSON.stringify(window.calendarStore));
     
     // 3. Render lists and close modal
     renderSpacedRepetition();
@@ -981,12 +988,39 @@ async function sendChat() {
     appendChatMessage(msg, 'user');
     input.value = '';
     
+    // Gather user study state for context-aware chatbot response
+    const userState = {
+        streak: parseInt(localStorage.getItem('current_streak_count') || '0'),
+        overdueCount: 0,
+        overdueList: [],
+        totalTopics: window.studyTopics ? window.studyTopics.length : 0,
+        masteredTopics: window.studyTopics ? window.studyTopics.filter(t => t.mastered).length : 0
+    };
+    
+    if (window.calendarStore && window.studyTopics) {
+        const now = new Date();
+        const overdueEvents = window.calendarStore.filter(e => e.status === 'pending' && new Date(e.startDateTime) < now);
+        userState.overdueCount = overdueEvents.length;
+        
+        const uniqueOverdue = new Set();
+        overdueEvents.forEach(evt => {
+            const topic = window.studyTopics.find(t => t.id === evt.topicId);
+            if (topic) {
+                uniqueOverdue.add(`${topic.subject} - ${topic.topic}`);
+            }
+        });
+        userState.overdueList = Array.from(uniqueOverdue);
+    }
+    
     try {
         const headers = isAuthenticated ? getAuthHeaders() : { 'Content-Type': 'application/json' };
         const res = await fetch('/api/chat', {
             method: 'POST',
             headers: headers,
-            body: JSON.stringify({ message: msg })
+            body: JSON.stringify({ 
+                message: msg,
+                userState: userState
+            })
         });
         
         if (res.ok) {

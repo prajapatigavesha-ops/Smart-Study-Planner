@@ -1048,11 +1048,38 @@ async function sendChat() {
     appendChatMessage(msg, 'user');
     input.value = '';
     
+    // Gather user study state for context-aware chatbot response
+    const userState = {
+        streak: parseInt(localStorage.getItem('current_streak_count') || '0'),
+        overdueCount: 0,
+        overdueList: [],
+        totalTopics: window.studyTopics ? window.studyTopics.length : 0,
+        masteredTopics: window.studyTopics ? window.studyTopics.filter(t => t.mastered).length : 0
+    };
+    
+    if (window.calendarStore && window.studyTopics) {
+        const now = new Date();
+        const overdueEvents = window.calendarStore.filter(e => e.status === 'pending' && new Date(e.startDateTime) < now);
+        userState.overdueCount = overdueEvents.length;
+        
+        const uniqueOverdue = new Set();
+        overdueEvents.forEach(evt => {
+            const topic = window.studyTopics.find(t => t.id === evt.topicId);
+            if (topic) {
+                uniqueOverdue.add(`${topic.subject} - ${topic.topic}`);
+            }
+        });
+        userState.overdueList = Array.from(uniqueOverdue);
+    }
+    
     try {
         const res = await fetch('/api/chat', {
             method: 'POST',
             headers: getAuthHeaders(),
-            body: JSON.stringify({ message: msg })
+            body: JSON.stringify({ 
+                message: msg,
+                userState: userState
+            })
         });
         
         if (res.ok) {
@@ -1484,6 +1511,11 @@ function openSyllabusManager() {
             window.lucide.createIcons();
         }
         setupSyllabusDropZone();
+        
+        const dateInput = document.getElementById("syllabusStartDate");
+        if (dateInput) {
+            dateInput.value = new Date().toISOString().split('T')[0];
+        }
     }
 }
 window.openSyllabusManager = openSyllabusManager;
@@ -1785,6 +1817,8 @@ function readFileAsDataURL(file) {
 // 4. Submit form logic
 async function submitSyllabusForm() {
     const textPaste = document.getElementById("syllabusTextPaste").value.trim();
+    const startDateVal = document.getElementById("syllabusStartDate").value;
+    const examDateVal = document.getElementById("syllabusExamDate").value;
     
     if (!currentUploadFile && !textPaste) {
         alert("Please upload a file or paste syllabus text!");
@@ -1824,16 +1858,14 @@ async function submitSyllabusForm() {
             }
         }
         
-        // Post payload to backend
-        const res = await fetch('/api/syllabi', {
+        // Post payload to schedule generator endpoint
+        const res = await fetch('/api/schedule/generate', {
             method: 'POST',
             headers: getAuthHeaders(),
             body: JSON.stringify({
-                fileName,
-                fileType,
-                fileSize,
-                fileData,
-                extractedText: text
+                syllabusText: text,
+                startDate: startDateVal,
+                targetExamDate: examDateVal
             })
         });
         
@@ -1843,13 +1875,37 @@ async function submitSyllabusForm() {
         }
         
         const data = await res.json();
-        parsedSyllabusTopics = data.parsed ? (data.parsed.topics || []) : [];
+        const schedule = data.schedule || {};
+        
+        // Map schedule topics to parsedSyllabusTopics format
+        parsedSyllabusTopics = (schedule.topics || []).map(t => ({
+            title: t.topic_title,
+            description: `Study and master this unit (Estimated: ${t.estimated_minutes} min). Module: ${t.unit_or_module}.`,
+            category: t.unit_or_module,
+            difficulty: t.difficulty,
+            initial_study_date: t.initial_study_date,
+            spaced_review_dates: t.spaced_review_dates
+        }));
         
         // Display parsed results
-        document.getElementById("parsedCourseName").innerText = data.parsed ? (data.parsed.course_name || "General Course Syllabus") : "General Course Syllabus";
-        document.getElementById("parsedStudyWeeks").innerText = data.parsed ? (data.parsed.estimated_study_weeks || 12) : 12;
+        document.getElementById("parsedCourseName").innerText = schedule.course_summary || "Course Syllabus Study Outline";
+        document.getElementById("parsedStudyWeeks").innerText = Math.ceil((schedule.total_topics || 3) / 2) || 12;
         
         renderSyllabusPreview(parsedSyllabusTopics);
+        
+        // Save file to database history in the background if a file was uploaded
+        if (currentUploadFile) {
+            fetch('/api/syllabi', {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                body: JSON.stringify({
+                    fileName,
+                    fileType,
+                    fileSize,
+                    fileData
+                })
+            }).catch(err => console.error("Failed to save syllabus to database history:", err));
+        }
         
         loader.style.display = "none";
         document.getElementById("syllabusPreviewStep").style.display = "flex";
@@ -1942,25 +1998,71 @@ function importSelectedSyllabusTopics() {
     const courseName = document.getElementById("parsedCourseName").innerText;
     let importCount = 0;
     
+    const userPrefixKey = typeof window.getPrefixedKey === 'function' ? window.getPrefixedKey('') : '';
+
     checkboxes.forEach(c => {
         if (c.checked) {
             const index = parseInt(c.dataset.index);
             const topic = parsedSyllabusTopics[index];
             if (topic && topic.title) {
-                if (typeof window.addNewTopic === 'function') {
-                    // Map: subject = category, topic = title, grade = courseName, tag = difficulty
-                    window.addNewTopic(topic.category || courseName, topic.title, courseName, topic.difficulty || "Medium");
-                    importCount++;
+                const topicId = 'topic-' + Math.random().toString(36).substring(2, 9) + '-' + Date.now().toString(36);
+                
+                // Add topic to active lists
+                const newTopic = {
+                    id: topicId,
+                    subject: topic.category || courseName,
+                    topic: topic.title,
+                    grade: courseName,
+                    tag: topic.difficulty || "Medium",
+                    mastered: true // Auto-mastered since review schedule is established
+                };
+                
+                if (window.studyTopics) {
+                    window.studyTopics.push(newTopic);
                 }
+                
+                // Add pre-calculated review dates to calendarStore
+                if (topic.spaced_review_dates && topic.spaced_review_dates.length > 0 && window.calendarStore) {
+                    topic.spaced_review_dates.forEach((dateStr, rIndex) => {
+                        const reviewDate = new Date(dateStr);
+                        reviewDate.setHours(9, 0, 0, 0); // Standardize to 9:00 AM
+                        
+                        const endDateTime = new Date(reviewDate.getTime());
+                        endDateTime.setMinutes(endDateTime.getMinutes() + 30);
+                        
+                        window.calendarStore.unshift({
+                            id: 'evt-' + Math.random().toString(36).substring(2, 11) + '-' + Date.now().toString(36),
+                            topicId: topicId,
+                            title: `Review ${rIndex + 1}: ${newTopic.subject} - ${newTopic.topic} (${courseName})`,
+                            startDateTime: reviewDate.toISOString(),
+                            endDateTime: endDateTime.toISOString(),
+                            status: 'pending',
+                            intervalStep: rIndex + 1
+                        });
+                    });
+                }
+                importCount++;
             }
         }
     });
     
     if (importCount > 0) {
+        if (window.studyTopics) {
+            localStorage.setItem(userPrefixKey + 'studyTopics', JSON.stringify(window.studyTopics));
+        }
+        if (window.calendarStore) {
+            localStorage.setItem(userPrefixKey + 'calendarStore', JSON.stringify(window.calendarStore));
+        }
+        
+        // Re-render spaced repetition container
+        if (typeof renderSpacedRepetition === 'function') {
+            renderSpacedRepetition();
+        }
         if (typeof renderTagFilters === 'function') {
             renderTagFilters();
         }
-        alert(`Imported ${importCount} topics directly into your spaced repetition scheduler!`);
+        
+        alert(`Imported ${importCount} topics with spaced repetition schedules into your planner!`);
         closeSyllabusManager();
     } else {
         alert("Please check at least one topic to import.");

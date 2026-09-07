@@ -3,9 +3,26 @@
  * Generalized for any Subject, Topic, or Grade level.
  */
 
+// Helper to get prefixed key name to prevent data leakage between users
+function getPrefixedKey(key) {
+    const token = localStorage.getItem('token');
+    if (!token) return key; // Local guest fallback
+    try {
+        const base64Url = token.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(window.atob(base64).split('').map(function(c) {
+            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        }).join(''));
+        const username = JSON.parse(jsonPayload).username || 'John Doe';
+        return username + '_' + key;
+    } catch (e) {
+        return 'John Doe_' + key;
+    }
+}
+
 // Load state from localStorage, defaulting to empty arrays
-let studyTopics = JSON.parse(localStorage.getItem('studyTopics')) || [];
-let calendarStore = JSON.parse(localStorage.getItem('calendarStore')) || [];
+let studyTopics = JSON.parse(localStorage.getItem(getPrefixedKey('studyTopics'))) || [];
+let calendarStore = JSON.parse(localStorage.getItem(getPrefixedKey('calendarStore'))) || [];
 
 /**
  * Generates 4 CalendarEvents at +1, +3, +7, and +30 day intervals.
@@ -56,7 +73,7 @@ function addNewTopic(subject, topic, grade, tag) {
         mastered: false
     };
     studyTopics.push(newTopic);
-    localStorage.setItem('studyTopics', JSON.stringify(studyTopics));
+    localStorage.setItem(getPrefixedKey('studyTopics'), JSON.stringify(studyTopics));
     
     // Re-render spaced repetition container
     if (typeof renderSpacedRepetition === 'function') {
@@ -82,8 +99,8 @@ function toggleTopicMastery(topicId) {
         calendarStore = calendarStore.filter(e => e.topicId !== topicId);
     }
     
-    localStorage.setItem('studyTopics', JSON.stringify(studyTopics));
-    localStorage.setItem('calendarStore', JSON.stringify(calendarStore));
+    localStorage.setItem(getPrefixedKey('studyTopics'), JSON.stringify(studyTopics));
+    localStorage.setItem(getPrefixedKey('calendarStore'), JSON.stringify(calendarStore));
     
     window.studyTopics = studyTopics;
     window.calendarStore = calendarStore;
@@ -98,7 +115,7 @@ function toggleReviewEvent(eventId) {
     if (!event) return;
     
     event.status = event.status === 'completed' ? 'pending' : 'completed';
-    localStorage.setItem('calendarStore', JSON.stringify(calendarStore));
+    localStorage.setItem(getPrefixedKey('calendarStore'), JSON.stringify(calendarStore));
     
     window.calendarStore = calendarStore;
     
@@ -110,7 +127,7 @@ function toggleReviewEvent(eventId) {
 function deleteReviewEvent(eventId) {
     if (confirm("Are you sure you want to delete this review event?")) {
         calendarStore = calendarStore.filter(e => e.id !== eventId);
-        localStorage.setItem('calendarStore', JSON.stringify(calendarStore));
+        localStorage.setItem(getPrefixedKey('calendarStore'), JSON.stringify(calendarStore));
         
         window.calendarStore = calendarStore;
         
@@ -125,8 +142,8 @@ function deleteTopic(topicId) {
         studyTopics = studyTopics.filter(t => t.id !== topicId);
         calendarStore = calendarStore.filter(e => e.topicId !== topicId);
         
-        localStorage.setItem('studyTopics', JSON.stringify(studyTopics));
-        localStorage.setItem('calendarStore', JSON.stringify(calendarStore));
+        localStorage.setItem(getPrefixedKey( 'studyTopics'), JSON.stringify(studyTopics));
+        localStorage.setItem(getPrefixedKey('calendarStore'), JSON.stringify(calendarStore));
         
         window.studyTopics = studyTopics;
         window.calendarStore = calendarStore;
@@ -147,3 +164,4 @@ window.toggleTopicMastery = toggleTopicMastery;
 window.toggleReviewEvent = toggleReviewEvent;
 window.deleteReviewEvent = deleteReviewEvent;
 window.deleteTopic = deleteTopic;
+window.getPrefixedKey = getPrefixedKey;
