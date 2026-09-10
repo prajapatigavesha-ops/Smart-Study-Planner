@@ -5,7 +5,8 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const path = require('path');
 require('dotenv').config();
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
+const resend = new Resend(process.env.RESEND_API_KEY);
 const { OpenAI } = require('openai');
 const { GoogleGenAI, Type } = require('@google/genai');
 const dns = require('dns');
@@ -268,45 +269,49 @@ app.post('/auth/send-otp', (req, res) => {
         db.run(`INSERT INTO otps (email, otp, expiresAt) VALUES (?, ?, ?)`, [email, otp, expiresAt.toISOString()], async (insertErr) => {
             if (insertErr) return res.status(500).json({ error: "Failed to store OTP: " + insertErr.message });
 
-            const hasEmailConfig = process.env.SMTP_USER && process.env.SMTP_PASS;
+            const hasResendKey = !!process.env.RESEND_API_KEY;
 
-            if (hasEmailConfig) {
-                const mailOptions = {
-                    from: `"Smart Study Planner" <${process.env.SMTP_USER}>`,
-                    to: email,
-                    subject: 'Your Verification Code - Smart Study Planner',
-                    html: `
-                        <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
-                            <h2 style="color: #6366f1;">Smart Study Planner</h2>
-                            <p>Hello,</p>
-                            <p>Your one-time verification code is:</p>
-                            <div style="font-size: 24px; font-weight: bold; padding: 10px 20px; background-color: #f3f4f6; display: inline-block; letter-spacing: 4px; border-radius: 6px; margin: 10px 0; color: #4f46e5;">
-                                ${otp}
+            if (hasResendKey) {
+                try {
+                    await resend.emails.send({
+                        // 'onboarding@resend.dev' works immediately with zero setup.
+                        // Once you verify your own domain on Resend, you can change this
+                        // to something like 'Smart Study Planner <noreply@yourdomain.com>'
+                        from: 'Smart Study Planner <onboarding@resend.dev>',
+                        to: email,
+                        subject: 'Your Verification Code - Smart Study Planner',
+                        html: `
+                            <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+                                <h2 style="color: #6366f1;">Smart Study Planner</h2>
+                                <p>Hello,</p>
+                                <p>Your one-time verification code is:</p>
+                                <div style="font-size: 24px; font-weight: bold; padding: 10px 20px; background-color: #f3f4f6; display: inline-block; letter-spacing: 4px; border-radius: 6px; margin: 10px 0; color: #4f46e5;">
+                                    ${otp}
+                                </div>
+                                <p>This code will expire in 5 minutes.</p>
+                                <p style="font-size: 12px; color: #6b7280; margin-top: 20px;">If you did not request this code, please ignore this email.</p>
                             </div>
-                            <p>This code will expire in 5 minutes.</p>
-                            <p style="font-size: 12px; color: #6b7280; margin-top: 20px;">If you did not request this code, please ignore this email.</p>
-                        </div>
-                    `
-                };
+                        `
+                    });
 
-                // Send mail in the background (asynchronously) without blocking the response
-                transporter.sendMail(mailOptions, (mailErr, info) => {
-                    if (mailErr) {
-                        console.error("❌ Background Mail Send Error:", mailErr.message);
-                    } else {
-                        console.log(`📧 OTP successfully sent in the background to ${email}: ${info.response}`);
+                    console.log(`📧 OTP sent via Resend to ${email}`);
+
+                    const responseData = { message: "OTP sent successfully to your email." };
+                    if (process.env.NODE_ENV !== 'production') {
+                        responseData._dev_otp = otp;
                     }
-                });
-
-                // Respond immediately
-                const responseData = { message: "OTP sent successfully to your email." };
-                if (process.env.NODE_ENV !== 'production') {
-                    responseData._dev_otp = otp;
-                    responseData.smtp_active = true;
+                    res.json(responseData);
+                } catch (resendErr) {
+                    console.error("❌ Resend API Error:", resendErr.message);
+                    // Fall back to dev mode so you're never fully blocked during testing
+                    res.json({
+                        message: "OTP generated (email send failed, dev fallback used).",
+                        _dev_otp: otp,
+                        warning: resendErr.message
+                    });
                 }
-                res.json(responseData);
             } else {
-                console.log(`[OTP DEBUG] OTP for ${email} is: ${otp}`);
+                console.log(`[OTP DEBUG] RESEND_API_KEY not set. OTP for ${email} is: ${otp}`);
                 res.json({
                     message: "OTP generated successfully (Development Mode)",
                     _dev_otp: otp,
