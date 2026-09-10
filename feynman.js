@@ -162,48 +162,66 @@ function evaluateExplanation() {
     document.getElementById("resultsStateCard").style.display = "none";
     document.getElementById("loadingStateCard").style.display = "flex";
     
-    // Simulate AI computing timeout (1.5 seconds)
-    setTimeout(() => {
+    let topicName = "General Concept";
+    if (activeTopic) {
+        topicName = `${activeTopic.subject} - ${activeTopic.topic}`;
+    } else {
+        const select = document.getElementById("topicSelect");
+        if (select && select.value) {
+            const opt = select.options[select.selectedIndex];
+            topicName = opt ? opt.text : "General Concept";
+        }
+    }
+
+    // Call live API
+    fetch('/api/feynman/evaluate', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token
+        },
+        body: JSON.stringify({
+            topic: topicName,
+            explanation: text
+        })
+    })
+    .then(res => {
+        if (!res.ok) throw new Error("Evaluation request failed.");
+        return res.json();
+    })
+    .then(data => {
         // Hide loader
         document.getElementById("loadingStateCard").style.display = "none";
         
-        // Calculate comprehension score (random baseline 70-85, influenced by word length)
-        let score = Math.floor(Math.random() * 15) + 70;
-        if (words > 40) score += 10;
-        if (words > 80) score += 5;
-        score = Math.min(98, score); // cap at 98 for realism
-        
-        // Load tailored critiques
-        let key = "default";
-        if (activeTopic) {
-            const sub = activeTopic.subject.toLowerCase();
-            const top = activeTopic.topic.toLowerCase();
-            if (sub.includes("biol") || top.includes("photo") || top.includes("cell")) {
-                key = "biology";
-            } else if (sub.includes("hist") || sub.includes("soc") || top.includes("revol")) {
-                key = "history";
+        if (data.success && data.report) {
+            const report = data.report;
+            
+            // Inject feedback texts
+            document.getElementById("jargonFeedback").innerText = report.jargon_spotted || "None detected.";
+            document.getElementById("gapFeedback").innerText = report.logical_gaps || "No logical gaps found.";
+            document.getElementById("analogyFeedback").innerText = report.recommended_analogy || "No analogy available.";
+            
+            // Render progress ring & percentage text
+            const score = report.clarity_score || 0;
+            document.getElementById("clarityScorePercent").innerText = score;
+            const circle = document.getElementById("clarityScoreCircle");
+            if (circle) {
+                const circumference = 314.16;
+                const offset = circumference - (score / 100) * circumference;
+                circle.style.strokeDashoffset = offset;
             }
+            
+            // Display results block
+            document.getElementById("resultsStateCard").style.display = "flex";
+        } else {
+            throw new Error(data.error || "Failed to parse report details.");
         }
-        
-        const critique = critiqueDatabase[key];
-        
-        // Inject feedback texts
-        document.getElementById("jargonFeedback").innerText = critique.jargon;
-        document.getElementById("gapFeedback").innerText = critique.gaps;
-        document.getElementById("analogyFeedback").innerText = critique.analogy;
-        
-        // Render progress ring & percentage text
-        document.getElementById("clarityScorePercent").innerText = score;
-        const circle = document.getElementById("clarityScoreCircle");
-        if (circle) {
-            const circumference = 314.16;
-            const offset = circumference - (score / 100) * circumference;
-            circle.style.strokeDashoffset = offset;
-        }
-        
-        // Display results block
-        document.getElementById("resultsStateCard").style.display = "flex";
-    }, 1500);
+    })
+    .catch(err => {
+        document.getElementById("loadingStateCard").style.display = "none";
+        alert("AI Evaluation failed: " + err.message);
+        document.getElementById("blankStateCard").style.display = "flex";
+    });
 }
 
 /**
