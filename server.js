@@ -6,7 +6,7 @@ const jwt = require('jsonwebtoken');
 const path = require('path');
 require('dotenv').config();
 const { Resend } = require('resend');
-const resend = new Resend(process.env.RESEND_API_KEY);
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 const { OpenAI } = require('openai');
 const { GoogleGenAI, Type } = require('@google/genai');
 const dns = require('dns');
